@@ -171,6 +171,7 @@ export interface GitStatusInfo {
   branch: string;
   dirty: boolean;
   remoteUrl: string | null;
+  hasSavedToken: boolean;
 }
 
 export interface AssetList {

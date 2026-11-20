@@ -26,6 +26,63 @@ async function runGit(cwd: string, args: string[], token?: string): Promise<stri
   return stdout.trim();
 }
 
+const PROJECT_ENV_FILE = '.env';
+
+export async function readProjectGitToken(dir: string): Promise<string | undefined> {
+  try {
+    const raw = await fs.readFile(path.join(dir, PROJECT_ENV_FILE), 'utf8');
+    for (const line of raw.split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      const eq = trimmed.indexOf('=');
+      if (eq < 0) continue;
+      const key = trimmed.slice(0, eq).trim();
+      if (key !== 'GIT_TOKEN') continue;
+      const val = trimmed
+        .slice(eq + 1)
+        .trim()
+        .replace(/^['"]|['"]$/g, '');
+      if (val) return val;
+    }
+  } catch {
+    return undefined;
+  }
+  return undefined;
+}
+
+export async function writeProjectGitToken(dir: string, token: string): Promise<void> {
+  const clean = token.trim();
+  if (!clean) {
+    await clearProjectGitToken(dir);
+    return;
+  }
+  await ensureDotEnvGitignored(dir);
+  const envPath = path.join(dir, PROJECT_ENV_FILE);
+  await fs.writeFile(envPath, `GIT_TOKEN=${clean}\n`, { encoding: 'utf8', mode: 0o600 });
+}
+
+export async function clearProjectGitToken(dir: string): Promise<void> {
+  try {
+    await fs.unlink(path.join(dir, PROJECT_ENV_FILE));
+  } catch {
+    // Already absent
+  }
+}
+
+async function ensureDotEnvGitignored(dir: string): Promise<void> {
+  const giPath = path.join(dir, '.gitignore');
+  try {
+    const existing = await fs.readFile(giPath, 'utf8');
+    const lines = existing.split(/\r?\n/).map((l) => l.trim());
+    if (!lines.includes('.env')) {
+      const sep = existing.endsWith('\n') || existing.length === 0 ? '' : '\n';
+      await fs.writeFile(giPath, `${existing}${sep}.env\n`, 'utf8');
+    }
+  } catch {
+    await fs.writeFile(giPath, '.DS_Store\n*.tmp\n.env\n', 'utf8');
+  }
+}
+
 export async function isGitRepo(dir: string): Promise<boolean> {
   try {
     await fs.access(path.join(dir, '.git'));
@@ -41,7 +98,7 @@ export async function initProjectRepo(dir: string, initialMessage: string): Prom
   }
   await runGit(dir, ['config', 'user.name', 'DeckPress']);
   await runGit(dir, ['config', 'user.email', 'deckpress@local']);
-  await runGit(dir, ['add', '-A']);
+  await runGit(dir, ['add', '-A', '--', ':!.env']);
   const status = await runGit(dir, ['status', '--porcelain']);
   if (status) {
     await runGit(dir, ['commit', '--no-gpg-sign', '-m', initialMessage]);
@@ -61,8 +118,9 @@ export async function cloneProjectRepo(
 }
 
 export async function getGitStatus(dir: string): Promise<GitStatusInfo> {
+  const hasSavedToken = Boolean(await readProjectGitToken(dir));
   if (!(await isGitRepo(dir))) {
-    return { isRepo: false, branch: '', dirty: false, remoteUrl: null };
+    return { isRepo: false, branch: '', dirty: false, remoteUrl: null, hasSavedToken };
   }
   let branch = 'main';
   try {
@@ -84,6 +142,7 @@ export async function getGitStatus(dir: string): Promise<GitStatusInfo> {
     branch,
     dirty: porcelain.length > 0,
     remoteUrl,
+    hasSavedToken,
   };
 }
 
@@ -92,7 +151,7 @@ export async function commitAll(dir: string, message: string): Promise<boolean> 
     await initProjectRepo(dir, message);
     return true;
   }
-  await runGit(dir, ['add', '-A']);
+  await runGit(dir, ['add', '-A', '--', ':!.env']);
   const status = await runGit(dir, ['status', '--porcelain']);
   if (!status) return false;
   await runGit(dir, ['commit', '--no-gpg-sign', '-m', message || 'chore: update design']);
@@ -153,11 +212,13 @@ export async function disconnectRemote(dir: string): Promise<void> {
 export async function pullRemote(dir: string, token?: string): Promise<string> {
   const status = await getGitStatus(dir);
   if (!status.remoteUrl) throw new Error('No Git remote is connected');
-  return runGit(dir, ['pull', '--ff-only', 'origin', status.branch || 'main'], token);
+  const effectiveToken = token?.trim() || (await readProjectGitToken(dir));
+  return runGit(dir, ['pull', '--ff-only', 'origin', status.branch || 'main'], effectiveToken);
 }
 
 export async function pushRemote(dir: string, token?: string): Promise<string> {
   const status = await getGitStatus(dir);
   if (!status.remoteUrl) throw new Error('No Git remote is connected');
-  return runGit(dir, ['push', '-u', 'origin', status.branch || 'main'], token);
+  const effectiveToken = token?.trim() || (await readProjectGitToken(dir));
+  return runGit(dir, ['push', '-u', 'origin', status.branch || 'main'], effectiveToken);
 }

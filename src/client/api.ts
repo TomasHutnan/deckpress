@@ -59,6 +59,7 @@ export const api = {
     mode: 'blank' | 'template' | 'clone';
     repoUrl?: string;
     token?: string;
+    saveToken?: boolean;
     googleSheetUrl?: string;
   }) =>
     jsonFetch<LoadedProject>('/api/projects', {
@@ -133,6 +134,12 @@ export const api = {
     jsonFetch<LoadedProject>(`/api/projects/${encodeURIComponent(slug)}/git/remote`, {
       method: 'POST',
       body: JSON.stringify({ action, remoteUrl }),
+    }),
+
+  gitSaveToken: (slug: string, token: string) =>
+    jsonFetch<LoadedProject>(`/api/projects/${encodeURIComponent(slug)}/git/token`, {
+      method: 'POST',
+      body: JSON.stringify({ token }),
     }),
 
   gitPull: (slug: string, token?: string) =>

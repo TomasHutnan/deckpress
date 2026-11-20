@@ -13,7 +13,13 @@ import type {
   GitStatusInfo,
   ProjectConfig,
 } from '../shared/types.js';
-import { cloneProjectRepo, commitAll, getGitStatus, initProjectRepo } from './git.js';
+import {
+  cloneProjectRepo,
+  commitAll,
+  getGitStatus,
+  initProjectRepo,
+  writeProjectGitToken,
+} from './git.js';
 
 export function getProjectsRoot(): string {
   if (process.env.DECKPRESS_DATA_DIR) {
@@ -131,6 +137,7 @@ export async function createProject(params: {
   mode: 'blank' | 'template' | 'clone';
   repoUrl?: string;
   token?: string;
+  saveToken?: boolean;
   googleSheetUrl?: string;
 }): Promise<LoadedProject> {
   const slug = sanitizeSlug(params.name);
@@ -148,6 +155,9 @@ export async function createProject(params: {
       throw new Error('Repository URL is required for clone mode');
     }
     await cloneProjectRepo(params.repoUrl.trim(), dir, params.token);
+    if (params.saveToken && params.token?.trim()) {
+      await writeProjectGitToken(dir, params.token);
+    }
     // Ensure required project files exist even if cloning an empty/partial repo
     await ensureProjectScaffold(dir, params.name, slug, 'template');
     return loadProject(slug);
@@ -187,7 +197,7 @@ async function ensureProjectScaffold(
   await writeIfMissing(path.join(dir, 'overrides.json'), '{}\n');
   await writeIfMissing(path.join(dir, 'custom.css'), '/* Project CSS overrides */\n');
   await writeIfMissing(path.join(dir, 'cards.csv'), STARTER_CSV);
-  await writeIfMissing(path.join(dir, '.gitignore'), '.DS_Store\n*.tmp\n');
+  await writeIfMissing(path.join(dir, '.gitignore'), '.DS_Store\n*.tmp\n.env\n');
 }
 
 export async function saveProjectConfig(

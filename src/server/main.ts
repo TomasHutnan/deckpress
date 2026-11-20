@@ -13,12 +13,14 @@ import type {
 } from '../shared/types.js';
 import { createBasicAuthVerifier } from './auth.js';
 import {
+  clearProjectGitToken,
   connectRemote,
   disconnectRemote,
   getGitLog,
   pullRemote,
   pushRemote,
   rollbackToCommit,
+  writeProjectGitToken,
 } from './git.js';
 import { renderHtmlToPdf } from './pdf.js';
 import {
@@ -77,6 +79,7 @@ app.post<{
     mode: 'blank' | 'template' | 'clone';
     repoUrl?: string;
     token?: string;
+    saveToken?: boolean;
     googleSheetUrl?: string;
   };
 }>('/api/projects', async (req, reply) => {
@@ -260,6 +263,24 @@ app.post<{
     return reply.code(400).send({ error: err instanceof Error ? err.message : String(err) });
   }
 });
+
+app.post<{ Params: { slug: string }; Body: { token?: string } }>(
+  '/api/projects/:slug/git/token',
+  async (req, reply) => {
+    try {
+      const dir = resolveProjectDir(req.params.slug);
+      const tok = (req.body?.token || '').trim();
+      if (tok) {
+        await writeProjectGitToken(dir, tok);
+      } else {
+        await clearProjectGitToken(dir);
+      }
+      return await loadProject(req.params.slug);
+    } catch (err: unknown) {
+      return reply.code(400).send({ error: err instanceof Error ? err.message : String(err) });
+    }
+  },
+);
 
 app.post<{ Params: { slug: string }; Body: { token?: string } }>(
   '/api/projects/:slug/git/pull',

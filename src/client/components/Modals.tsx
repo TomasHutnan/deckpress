@@ -23,6 +23,7 @@ export function NewProjectModal({
   const [mode, setMode] = useState<'template' | 'blank' | 'clone'>('template');
   const [repoUrl, setRepoUrl] = useState('');
   const [token, setToken] = useState('');
+  const [saveToken, setSaveToken] = useState(true);
   const [googleSheetUrl, setGoogleSheetUrl] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -37,6 +38,7 @@ export function NewProjectModal({
         mode,
         repoUrl: mode === 'clone' ? repoUrl : undefined,
         token: mode === 'clone' ? token : undefined,
+        saveToken: mode === 'clone' ? saveToken : undefined,
         googleSheetUrl: mode !== 'clone' ? googleSheetUrl : undefined,
       });
       onCreated(created);
@@ -108,14 +110,24 @@ export function NewProjectModal({
               />
             </div>
             <div className="field">
-              <label>Access Token (optional, for private repos — never saved)</label>
+              <label>Access Token (optional, for private repos)</label>
               <input
                 type="password"
-                placeholder="ghp_..."
+                placeholder="github_pat_..."
                 value={token}
                 onChange={(e) => setToken(e.target.value)}
               />
             </div>
+            {token.trim() && (
+              <label style={{ justifyContent: 'flex-start', gap: 8, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={saveToken}
+                  onChange={(e) => setSaveToken(e.target.checked)}
+                />
+                <span>Save token in project&apos;s gitignored server <code>.env</code> (write-only)</span>
+              </label>
+            )}
           </>
         ) : (
           <div className="field">
@@ -244,13 +256,59 @@ export function GitModal({
             {git.remoteUrl && (
               <>
                 <div className="field">
-                  <label>Personal Access Token (ephemeral, never stored)</label>
+                  <label>
+                    Access Token{' '}
+                    <span>
+                      {git.hasSavedToken
+                        ? '✓ Saved in server .env (hidden)'
+                        : 'Not saved on server'}
+                    </span>
+                  </label>
                   <input
                     type="password"
-                    placeholder="ghp_... (optional for public pull)"
+                    placeholder={
+                      git.hasSavedToken
+                        ? 'Leave blank to use saved server .env token, or enter a new one'
+                        : 'github_pat_... (optional for public pull)'
+                    }
                     value={token}
                     onChange={(e) => setToken(e.target.value)}
                   />
+                </div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {token.trim() && (
+                    <button
+                      type="button"
+                      className="btn"
+                      disabled={busy}
+                      onClick={() =>
+                        handleAction(async () => {
+                          const p = await api.gitSaveToken(slug, token);
+                          setToken('');
+                          onProjectReloaded(p);
+                          setStatusMsg('Token saved to project .env (gitignored, write-only).');
+                        })
+                      }
+                    >
+                      Save Token to Server .env
+                    </button>
+                  )}
+                  {git.hasSavedToken && (
+                    <button
+                      type="button"
+                      className="btn btn-danger"
+                      disabled={busy}
+                      onClick={() =>
+                        handleAction(async () => {
+                          const p = await api.gitSaveToken(slug, '');
+                          onProjectReloaded(p);
+                          setStatusMsg('Cleared saved token from project .env.');
+                        })
+                      }
+                    >
+                      Clear Saved Token
+                    </button>
+                  )}
                 </div>
                 <div className="field-row">
                   <button
