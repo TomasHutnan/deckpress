@@ -96,6 +96,7 @@ export function parseCsv(input: string): CardRow[] {
       image: String(record.image || ''),
       is_action: String(record.is_action || '0'),
       description: String(record.description || ''),
+      recipe_change: record.recipe_change ? String(record.recipe_change) : undefined,
       seed: record.seed ? String(record.seed) : undefined,
     });
   }

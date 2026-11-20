@@ -95,6 +95,28 @@ describe('DeckPress shared card engine', () => {
     assert.match(specialRes.html, /class="dp-subtitle">ŠPECIÁLNA KARTA</);
     assert.doesNotMatch(specialRes.html, /dp-subtitle-muted/);
 
+    const [recipeCard] = expandCards(
+      parseCsv(
+        'id,type_group,kitchen,size,title,subtitle,tags_str,count,image,is_action,description,recipe_change\n' +
+          'C88,Špeciálna,TAL,,DETSKÁ PORCIA,ŠPECIÁLNA KARTA,TAL,1,,2,Na TAL chody ti stačia iba tri suroviny,2+2 -> 2+1',
+      ),
+    );
+    const recipeHtml = renderCardHtml(
+      recipeCard,
+      variant,
+      {},
+      '/api/projects/the-menu/assets',
+    ).html;
+    assert.match(recipeHtml, /dp-recipe-change/);
+    assert.match(
+      recipeHtml,
+      new RegExp(`style="color:${variant.palette.TAL}">2</span>.*style="color:${variant.palette.UNI}">2</span>.*→.*style="color:${variant.palette.TAL}">2</span>.*style="color:${variant.palette.UNI}">1</span>`),
+    );
+    assert.match(
+      recipeHtml,
+      new RegExp(`<strong style="color:${variant.palette.TAL}">TAL</strong>`),
+    );
+
     const individualDoc = renderPrintDocumentHtml({
       cards,
       variant,

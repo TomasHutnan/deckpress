@@ -109,18 +109,59 @@ function renderDualCard(
   `;
 }
 
+function renderDescriptionHtml(
+  description: string,
+  palette: Record<string, string>,
+): string {
+  const escaped = escapeHtml(description);
+  const kitchenKeys = Object.keys(palette).filter(
+    (k) => k !== 'default' && /^[A-Z0-9]+$/.test(k),
+  );
+  if (kitchenKeys.length === 0) return escaped;
+  const pattern = new RegExp(`\\b(${kitchenKeys.join('|')})\\b`, 'g');
+  return escaped.replace(
+    pattern,
+    (match) => `<strong style="color:${palette[match]}">${match}</strong>`,
+  );
+}
+
+function renderRecipeChangeHtml(
+  recipeChange: string | undefined,
+  kitchenColor: string,
+  uniColor: string,
+): string {
+  const raw = (recipeChange || '').trim().replace(/^\(|\)$/g, '').trim();
+  if (!raw) return '';
+
+  const match = raw.match(/^(\d+)\s*\+\s*(\d+)\s*(?:->|→)\s*(\d+)\s*\+\s*(\d+)$/);
+  if (!match) {
+    return `<div class="dp-recipe-change">${escapeHtml(raw)}</div>`;
+  }
+
+  const [, k1, u1, k2, u2] = match;
+  return `<div class="dp-recipe-change"><span class="dp-rc-num" style="color:${kitchenColor}">${k1}</span><span class="dp-rc-op">+</span><span class="dp-rc-num" style="color:${uniColor}">${u1}</span><span class="dp-rc-arrow">→</span><span class="dp-rc-num" style="color:${kitchenColor}">${k2}</span><span class="dp-rc-op">+</span><span class="dp-rc-num" style="color:${uniColor}">${u2}</span></div>`;
+}
+
 function renderActionOrSpecial(
   card: ExpandedCard,
   layout: ComputedCardLayout,
   variant: DesignVariant,
 ): string {
+  const uniColor = variant.palette.UNI ?? '#888888';
+  const recipeHtml = renderRecipeChangeHtml(
+    card.recipe_change,
+    layout.primaryColor,
+    uniColor,
+  );
+
   return `
     <div class="dp-top-block dp-block-solid dp-block-compact" style="left:${Math.min(layout.topBlockLeftPct, 16)}%;height:26%;background:${layout.primaryColor}">
       <div class="dp-title dp-title-action">${escapeHtml(card.title)}</div>
       ${card.tags_str ? `<div class="dp-tags" style="margin-left:${layout.tagsLeftPct}%">${escapeHtml(card.tags_str)}</div>` : ''}
     </div>
     <div class="dp-body-zone">
-      <p class="dp-description">${escapeHtml(card.description)}</p>
+      <p class="dp-description">${renderDescriptionHtml(card.description, variant.palette)}</p>
+      ${recipeHtml}
     </div>
     <div class="dp-bottom-zone">
       ${variant.divider.enabled ? renderDividerHtml(layout.dividerStyle) : ''}
@@ -295,8 +336,10 @@ export function renderCardsBaseCss(cardSize: CardSize, customCss = ''): string {
       right: 7%;
       bottom: 18%;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
+      gap: 3mm;
       text-align: center;
       z-index: 3;
     }
@@ -306,6 +349,22 @@ export function renderCardsBaseCss(cardSize: CardSize, customCss = ''): string {
       font-size: var(--dp-body-size);
       line-height: 1.45;
       font-weight: 400;
+    }
+    .dp-recipe-change {
+      font-family: var(--dp-sub-font);
+      font-size: calc(var(--dp-body-size) * 1.45);
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      display: inline-flex;
+      align-items: center;
+      gap: 1mm;
+    }
+    .dp-rc-op, .dp-rc-arrow {
+      color: var(--dp-fg, #0F0F0F);
+      font-weight: 600;
+    }
+    .dp-rc-arrow {
+      margin: 0 0.8mm;
     }
     .dp-bottom-zone {
       position: absolute;

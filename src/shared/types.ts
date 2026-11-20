@@ -97,6 +97,7 @@ export interface CardRow {
   image: string;
   is_action: string;
   description: string;
+  recipe_change?: string;
   seed?: string;
   [key: string]: string | number | undefined;
 }
