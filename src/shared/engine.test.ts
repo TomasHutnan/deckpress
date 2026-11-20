@@ -144,8 +144,8 @@ describe('DeckPress shared card engine', () => {
     }
     const wm0 = renderCardHtml(cards[0], wmVariant, {}, '/assets', undefined, 0, sheetSize).html;
     const wm1 = renderCardHtml(cards[1], wmVariant, {}, '/assets', undefined, 1, sheetSize).html;
-    assert.match(wm0, /class="dp-watermark-layer" viewBox="0 0 63 88"/);
-    assert.match(wm1, /class="dp-watermark-layer" viewBox="63 0 63 88"/);
+    assert.match(wm0, /class="dp-watermark-layer"[^>]*viewBox="0 0 63 88"/);
+    assert.match(wm1, /class="dp-watermark-layer"[^>]*viewBox="63 0 63 88"/);
 
     const individualDoc = renderPrintDocumentHtml({
       cards,

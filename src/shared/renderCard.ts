@@ -193,11 +193,11 @@ function renderWatermarkLayer(
   const items = words
     .map(
       (w) =>
-        `<text x="${w.x}" y="${w.y}" text-anchor="middle" dominant-baseline="central" transform="rotate(${w.angleDeg} ${w.x} ${w.y})" font-family="${font}" font-size="${w.sizeMm}" font-weight="700" fill="${color}" fill-opacity="${params.opacity}" letter-spacing="0.02em">${escaped}</text>`,
+        `<text x="${w.x}" y="${w.y}" text-anchor="middle" dominant-baseline="central" transform="rotate(${w.angleDeg} ${w.x} ${w.y})" font-family="${font}" font-size="${w.sizeMm}" font-weight="700" fill="${color}" letter-spacing="0.02em">${escaped}</text>`,
     )
     .join('');
 
-  return `<svg class="dp-watermark-layer" viewBox="${sheetX} ${sheetY} ${cardSize.widthMm} ${cardSize.heightMm}" preserveAspectRatio="none" aria-hidden="true">${items}</svg>`;
+  return `<svg class="dp-watermark-layer" style="opacity:${params.opacity}" viewBox="${sheetX} ${sheetY} ${cardSize.widthMm} ${cardSize.heightMm}" preserveAspectRatio="none" aria-hidden="true">${items}</svg>`;
 }
 
 export function renderCardHtml(

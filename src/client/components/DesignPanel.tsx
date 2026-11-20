@@ -282,8 +282,8 @@ export function DesignPanel({
               </label>
               <input
                 type="range"
-                min={0.03}
-                max={0.4}
+                min={0.02}
+                max={1}
                 step={0.01}
                 value={variant.canvas.patternOpacity}
                 onChange={(e) =>
@@ -362,7 +362,7 @@ export function DesignPanel({
               <input
                 type="range"
                 min={0.02}
-                max={0.25}
+                max={1}
                 step={0.01}
                 value={variant.canvas.watermarkOpacity ?? 0.06}
                 onChange={(e) =>
