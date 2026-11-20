@@ -1,5 +1,6 @@
 import { BUILTIN_FOOD_ICONS } from './defaults.js';
 import { computeCardLayout } from './layout.js';
+import { getCardWatermarks } from './watermark.js';
 import type {
   CardOverrides,
   CardSize,
@@ -178,38 +179,25 @@ function renderWatermarkLayer(
   cardSize: CardSize,
 ): string {
   if (variant.canvas.mode !== 'watermark') return '';
-  const text = (variant.canvas.watermarkText || variant.gameMark.text || 'MENU').trim();
-  if (!text) return '';
+  const { sheetX, sheetY, words, params } = getCardWatermarks(
+    variant,
+    cardIndex,
+    cardSize,
+  );
+  if (!params.text) return '';
 
-  const opacity = variant.canvas.watermarkOpacity ?? 0.06;
-  const color = variant.canvas.watermarkColor || '#000000';
-  const sizeMm = Math.max(8, variant.canvas.watermarkSizeMm ?? 34);
-  const angleDeg = variant.canvas.watermarkAngleDeg ?? -18;
-  const cols = Math.max(1, Math.round(variant.canvas.watermarkCols ?? 3));
+  const escaped = escapeHtml(params.text);
+  const font = escapeHtml(variant.typography.titleFont);
+  const color = escapeHtml(params.color);
 
-  const col = cardIndex % cols;
-  const row = Math.floor(cardIndex / cols);
-  const sheetX = col * cardSize.widthMm;
-  const sheetY = row * cardSize.heightMm;
+  const items = words
+    .map(
+      (w) =>
+        `<text x="${w.x}" y="${w.y}" text-anchor="middle" dominant-baseline="central" transform="rotate(${w.angleDeg} ${w.x} ${w.y})" font-family="${font}" font-size="${w.sizeMm}" font-weight="700" fill="${color}" fill-opacity="${params.opacity}" letter-spacing="0.02em">${escaped}</text>`,
+    )
+    .join('');
 
-  // Approximate condensed uppercase word width in mm so tiles connect with clean spacing
-  const tileW = Math.max(sizeMm * 1.4, text.length * sizeMm * 0.54 + sizeMm * 0.45);
-  const tileH = sizeMm * 1.05;
-  const patId = `dp-wm-${cardIndex}`;
-  const escaped = escapeHtml(text.toUpperCase());
-
-  return `
-    <svg class="dp-watermark-layer" viewBox="${sheetX} ${sheetY} ${cardSize.widthMm} ${cardSize.heightMm}" preserveAspectRatio="none" aria-hidden="true">
-      <defs>
-        <pattern id="${patId}" patternUnits="userSpaceOnUse" width="${tileW}" height="${tileH * 2}" patternTransform="rotate(${angleDeg})">
-          <text x="0" y="${sizeMm * 0.85}" font-family="${escapeHtml(variant.typography.titleFont)}" font-size="${sizeMm}" font-weight="700" fill="${escapeHtml(color)}" fill-opacity="${opacity}" letter-spacing="0.02em">${escaped}</text>
-          <text x="${tileW / 2}" y="${tileH + sizeMm * 0.85}" font-family="${escapeHtml(variant.typography.titleFont)}" font-size="${sizeMm}" font-weight="700" fill="${escapeHtml(color)}" fill-opacity="${opacity}" letter-spacing="0.02em">${escaped}</text>
-          <text x="${-tileW / 2}" y="${tileH + sizeMm * 0.85}" font-family="${escapeHtml(variant.typography.titleFont)}" font-size="${sizeMm}" font-weight="700" fill="${escapeHtml(color)}" fill-opacity="${opacity}" letter-spacing="0.02em">${escaped}</text>
-        </pattern>
-      </defs>
-      <rect x="${sheetX}" y="${sheetY}" width="${cardSize.widthMm}" height="${cardSize.heightMm}" fill="url(#${patId})" />
-    </svg>
-  `;
+  return `<svg class="dp-watermark-layer" viewBox="${sheetX} ${sheetY} ${cardSize.widthMm} ${cardSize.heightMm}" preserveAspectRatio="none" aria-hidden="true">${items}</svg>`;
 }
 
 export function renderCardHtml(

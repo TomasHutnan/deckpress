@@ -71,7 +71,13 @@ export interface DesignVariant {
     watermarkOpacity?: number;
     watermarkColor?: string;
     watermarkSizeMm?: number;
+    watermarkSizeMinMm?: number;
+    watermarkSizeMaxMm?: number;
     watermarkAngleDeg?: number;
+    watermarkAngleMinDeg?: number;
+    watermarkAngleMaxDeg?: number;
+    watermarkDensity?: number;
+    watermarkAllowOverlap?: boolean;
     watermarkCols?: number;
   };
 }

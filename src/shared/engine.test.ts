@@ -4,6 +4,7 @@ import { expandCards, parseCsv } from './csv.js';
 import { createMenuTemplateDesign } from './defaults.js';
 import { computeCardLayout, detectCardKind } from './layout.js';
 import { renderCardHtml, renderPrintDocumentHtml } from './renderCard.js';
+import { getSheetWatermarks, watermarksOverlap } from './watermark.js';
 
 describe('DeckPress shared card engine', () => {
   it('parses Slovak UTF-8 CSV with quoted fields and expands counts', () => {
@@ -125,17 +126,24 @@ describe('DeckPress shared card engine', () => {
     const wmVariant = structuredClone(variant);
     wmVariant.canvas.mode = 'watermark';
     wmVariant.canvas.watermarkText = 'MENU';
+    wmVariant.canvas.watermarkSizeMinMm = 18;
+    wmVariant.canvas.watermarkSizeMaxMm = 42;
+    wmVariant.canvas.watermarkAngleMinDeg = -35;
+    wmVariant.canvas.watermarkAngleMaxDeg = 35;
+    wmVariant.canvas.watermarkAllowOverlap = false;
     wmVariant.canvas.watermarkCols = 3;
-    const wm0 = renderCardHtml(cards[0], wmVariant, {}, '/assets', undefined, 0, {
-      widthMm: 63,
-      heightMm: 88,
-      bleedMm: 0,
-    }).html;
-    const wm1 = renderCardHtml(cards[1], wmVariant, {}, '/assets', undefined, 1, {
-      widthMm: 63,
-      heightMm: 88,
-      bleedMm: 0,
-    }).html;
+    const sheetSize = { widthMm: 63, heightMm: 88, bleedMm: 0 };
+    const wmWords = getSheetWatermarks(wmVariant, sheetSize, 6);
+    assert.ok(wmWords.length > 0);
+    for (let i = 0; i < wmWords.length; i++) {
+      assert.ok(wmWords[i].sizeMm >= 18 && wmWords[i].sizeMm <= 42);
+      assert.ok(wmWords[i].angleDeg >= -35 && wmWords[i].angleDeg <= 35);
+      for (let j = i + 1; j < wmWords.length; j++) {
+        assert.equal(watermarksOverlap(wmWords[i], wmWords[j]), false);
+      }
+    }
+    const wm0 = renderCardHtml(cards[0], wmVariant, {}, '/assets', undefined, 0, sheetSize).html;
+    const wm1 = renderCardHtml(cards[1], wmVariant, {}, '/assets', undefined, 1, sheetSize).html;
     assert.match(wm0, /class="dp-watermark-layer" viewBox="0 0 63 88"/);
     assert.match(wm1, /class="dp-watermark-layer" viewBox="63 0 63 88"/);
 

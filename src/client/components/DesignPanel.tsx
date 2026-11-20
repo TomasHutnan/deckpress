@@ -373,42 +373,102 @@ export function DesignPanel({
                 }
               />
             </div>
+            <div className="field-row">
+              <div className="field">
+                <label>Min Size (mm)</label>
+                <input
+                  type="number"
+                  min={8}
+                  max={80}
+                  value={variant.canvas.watermarkSizeMinMm ?? 18}
+                  onChange={(e) =>
+                    updateVariant((v) => ({
+                      ...v,
+                      canvas: { ...v.canvas, watermarkSizeMinMm: Number(e.target.value) },
+                    }))
+                  }
+                />
+              </div>
+              <div className="field">
+                <label>Max Size (mm)</label>
+                <input
+                  type="number"
+                  min={8}
+                  max={90}
+                  value={variant.canvas.watermarkSizeMaxMm ?? 44}
+                  onChange={(e) =>
+                    updateVariant((v) => ({
+                      ...v,
+                      canvas: { ...v.canvas, watermarkSizeMaxMm: Number(e.target.value) },
+                    }))
+                  }
+                />
+              </div>
+            </div>
+            <div className="field-row">
+              <div className="field">
+                <label>Min Angle (°)</label>
+                <input
+                  type="number"
+                  min={-180}
+                  max={180}
+                  value={variant.canvas.watermarkAngleMinDeg ?? -35}
+                  onChange={(e) =>
+                    updateVariant((v) => ({
+                      ...v,
+                      canvas: { ...v.canvas, watermarkAngleMinDeg: Number(e.target.value) },
+                    }))
+                  }
+                />
+              </div>
+              <div className="field">
+                <label>Max Angle (°)</label>
+                <input
+                  type="number"
+                  min={-180}
+                  max={180}
+                  value={variant.canvas.watermarkAngleMaxDeg ?? 35}
+                  onChange={(e) =>
+                    updateVariant((v) => ({
+                      ...v,
+                      canvas: { ...v.canvas, watermarkAngleMaxDeg: Number(e.target.value) },
+                    }))
+                  }
+                />
+              </div>
+            </div>
             <div className="field">
               <label>
-                Text Size <span>{variant.canvas.watermarkSizeMm ?? 34} mm</span>
+                Density (per card){' '}
+                <span>{(variant.canvas.watermarkDensity ?? 1.8).toFixed(1)}</span>
               </label>
               <input
                 type="range"
-                min={14}
-                max={64}
-                step={1}
-                value={variant.canvas.watermarkSizeMm ?? 34}
+                min={0.4}
+                max={6}
+                step={0.2}
+                value={variant.canvas.watermarkDensity ?? 1.8}
                 onChange={(e) =>
                   updateVariant((v) => ({
                     ...v,
-                    canvas: { ...v.canvas, watermarkSizeMm: Number(e.target.value) },
+                    canvas: { ...v.canvas, watermarkDensity: Number(e.target.value) },
                   }))
                 }
               />
             </div>
-            <div className="field">
-              <label>
-                Angle <span>{variant.canvas.watermarkAngleDeg ?? -18}°</span>
-              </label>
+            <label style={{ justifyContent: 'flex-start', gap: 8, cursor: 'pointer' }}>
               <input
-                type="range"
-                min={-45}
-                max={45}
-                step={1}
-                value={variant.canvas.watermarkAngleDeg ?? -18}
+                type="checkbox"
+                checked={variant.canvas.watermarkAllowOverlap ?? false}
                 onChange={(e) =>
                   updateVariant((v) => ({
                     ...v,
-                    canvas: { ...v.canvas, watermarkAngleDeg: Number(e.target.value) },
+                    canvas: { ...v.canvas, watermarkAllowOverlap: e.target.checked },
                   }))
                 }
               />
-            </div>
+              <span>Allow overlapping watermarks</span>
+            </label>
             <div className="field-row">
               <div className="field">
                 <label>Sheet Columns</label>
