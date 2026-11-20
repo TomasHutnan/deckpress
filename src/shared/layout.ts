@@ -9,10 +9,41 @@ import type {
   PatternStamp,
 } from './types.js';
 
-export function resolveColor(colorKey: string, palette: Record<string, string>): string {
-  const key = colorKey.trim().toLowerCase();
-  if (!key) return palette.default ?? '#2D2D2D';
-  return palette[key] ?? palette[colorKey.trim()] ?? palette.default ?? '#2D2D2D';
+const COLOR_TO_CUISINE_ALIAS: Record<string, string> = {
+  'zelená': 'TAL',
+  zelena: 'TAL',
+  'modrá': 'FRA',
+  modra: 'FRA',
+  'žltá': 'MEX',
+  zlta: 'MEX',
+  'hnedá': 'IND',
+  hneda: 'IND',
+  'červená': 'JAP',
+  cervena: 'JAP',
+  'sivá': 'UNI',
+  siva: 'UNI',
+  'čierna': 'Akcia',
+  cierna: 'Akcia',
+};
+
+export function resolveColor(
+  key: string,
+  palette: Record<string, string>,
+  fallbackKey?: string,
+): string {
+  const raw = key.trim();
+  const lower = raw.toLowerCase();
+  const upper = raw.toUpperCase();
+  const alias = COLOR_TO_CUISINE_ALIAS[lower];
+
+  const candidates = [raw, upper, lower, alias, fallbackKey, 'Špeciálna', 'default'].filter(
+    Boolean,
+  ) as string[];
+
+  for (const c of candidates) {
+    if (palette[c]) return palette[c];
+  }
+  return '#2D2D2D';
 }
 
 export function detectCardKind(card: ExpandedCard): CardKind {
@@ -48,10 +79,16 @@ export function computeCardLayout(
   const rng = mulberry32(effectiveSeed);
   const kind = detectCardKind(card);
 
+  const kitchenParts = card.kitchen.split('~').map((s) => s.trim()).filter(Boolean);
   const colorParts = card.color.split('/').map((s) => s.trim()).filter(Boolean);
-  const primaryColor = resolveColor(colorParts[0] ?? '', variant.palette);
-  const secondaryColor =
-    colorParts.length > 1 ? resolveColor(colorParts[1], variant.palette) : undefined;
+  const fallbackKey = kind === 'action' ? 'Akcia' : kind === 'special' ? 'Špeciálna' : 'UNI';
+
+  const primaryKey = kitchenParts[0] || colorParts[0] || fallbackKey;
+  const secondaryKey = kitchenParts[1] || colorParts[1];
+  const primaryColor = resolveColor(primaryKey, variant.palette, fallbackKey);
+  const secondaryColor = secondaryKey
+    ? resolveColor(secondaryKey, variant.palette, fallbackKey)
+    : undefined;
 
   // Keep long titles from overflowing right edge by capping left offset proportionally.
   const titleLen = card.title.length;

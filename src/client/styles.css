@@ -163,13 +163,14 @@ html, body, #root {
 .section {
   border: 1px solid var(--ui-border);
   border-radius: 8px;
-  overflow: hidden;
+  flex-shrink: 0;
 }
 
 .section-header {
   width: 100%;
   background: #f9fafb;
   border: 0;
+  border-radius: 7px 7px 0 0;
   padding: 9px 12px;
   text-align: left;
   font-weight: 600;

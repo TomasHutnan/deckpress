@@ -75,6 +75,8 @@ describe('DeckPress shared card engine', () => {
 
     const single = renderCardHtml(cards[1], variant, {}, '/api/projects/the-menu/assets');
     assert.match(single.html, /dp-dual-bottom/);
+    assert.equal(single.layout.primaryColor, variant.palette.IND);
+    assert.equal(single.layout.secondaryColor, variant.palette.JAP);
 
     const individualDoc = renderPrintDocumentHtml({
       cards,

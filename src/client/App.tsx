@@ -33,6 +33,7 @@ export function App() {
   const [saving, setSaving] = useState(false);
 
   const [modal, setModal] = useState<'none' | 'new' | 'git' | 'assets' | 'export'>('none');
+  const [assetsTab, setAssetsTab] = useState<'images' | 'icons' | 'fonts'>('images');
 
   const applyLoadedProject = (proj: LoadedProject) => {
     setSavedProject(proj);
@@ -248,6 +249,10 @@ export function App() {
             onCustomCssChange={setDraftCustomCss}
             onSyncSheet={handleSyncSheet}
             onUploadCsv={handleUploadCsv}
+            onOpenAssets={(tab) => {
+              setAssetsTab(tab);
+              setModal('assets');
+            }}
           />
           <CardGrid
             slug={activeSlug}
@@ -324,6 +329,7 @@ export function App() {
         <AssetsModal
           slug={activeSlug}
           assets={savedProject.assets}
+          initialTab={assetsTab}
           onClose={() => setModal('none')}
           onAssetsUpdated={(nextAssets) =>
             setSavedProject((prev) => (prev ? { ...prev, assets: nextAssets } : prev))

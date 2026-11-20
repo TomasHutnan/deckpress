@@ -18,6 +18,7 @@ interface DesignPanelProps {
   onCustomCssChange: (next: string) => void;
   onSyncSheet: () => void;
   onUploadCsv: (file: File) => void;
+  onOpenAssets: (tab: 'images' | 'icons' | 'fonts') => void;
 }
 
 const FONT_OPTIONS = [
@@ -68,6 +69,7 @@ export function DesignPanel({
   onCustomCssChange,
   onSyncSheet,
   onUploadCsv,
+  onOpenAssets,
 }: DesignPanelProps) {
   const activeKey = design.activeVariant;
   const variant = design.variants[activeKey] || Object.values(design.variants)[0];
@@ -326,6 +328,29 @@ export function DesignPanel({
                 }
               />
             </div>
+            <button
+              type="button"
+              className="btn"
+              onClick={() => onOpenAssets('icons')}
+            >
+              + Upload Custom Pattern SVGs ({assets.icons.length})
+            </button>
+          </>
+        )}
+        {variant.canvas.mode === 'image' && (
+          <>
+            <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.4 }}>
+              Images are matched by filename from the <code>image</code> column in your
+              Google Sheet / CSV (e.g. <code>images/pesto.jpg</code> → upload{' '}
+              <code>pesto.jpg</code>).
+            </div>
+            <button
+              type="button"
+              className="btn"
+              onClick={() => onOpenAssets('images')}
+            >
+              + Upload / Manage Card Art ({assets.images.length})
+            </button>
           </>
         )}
       </Section>
@@ -564,6 +589,60 @@ export function DesignPanel({
             ))}
           </select>
         </div>
+        <div className="field">
+          <label>Tags Font</label>
+          <select
+            value={variant.typography.tagsFont}
+            onChange={(e) =>
+              updateVariant((v) => ({
+                ...v,
+                typography: { ...v.typography, tagsFont: e.target.value },
+              }))
+            }
+          >
+            {fontChoices.map((f) => (
+              <option key={f.value} value={f.value}>
+                {f.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="field">
+          <label>Subtitle Font</label>
+          <select
+            value={variant.typography.subtitleFont}
+            onChange={(e) =>
+              updateVariant((v) => ({
+                ...v,
+                typography: { ...v.typography, subtitleFont: e.target.value },
+              }))
+            }
+          >
+            {fontChoices.map((f) => (
+              <option key={f.value} value={f.value}>
+                {f.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="field">
+          <label>Body / Action Text Font</label>
+          <select
+            value={variant.typography.bodyFont}
+            onChange={(e) =>
+              updateVariant((v) => ({
+                ...v,
+                typography: { ...v.typography, bodyFont: e.target.value },
+              }))
+            }
+          >
+            {fontChoices.map((f) => (
+              <option key={f.value} value={f.value}>
+                {f.label}
+              </option>
+            ))}
+          </select>
+        </div>
         <div className="field-row">
           <div className="field">
             <label>Title (pt)</label>
@@ -596,6 +675,46 @@ export function DesignPanel({
             />
           </div>
         </div>
+        <div className="field-row">
+          <div className="field">
+            <label>Tags (pt)</label>
+            <input
+              type="number"
+              min={6}
+              max={22}
+              value={variant.typography.tagsSizePt}
+              onChange={(e) =>
+                updateVariant((v) => ({
+                  ...v,
+                  typography: { ...v.typography, tagsSizePt: Number(e.target.value) },
+                }))
+              }
+            />
+          </div>
+          <div className="field">
+            <label>Body (pt)</label>
+            <input
+              type="number"
+              min={7}
+              max={20}
+              step={0.5}
+              value={variant.typography.bodySizePt}
+              onChange={(e) =>
+                updateVariant((v) => ({
+                  ...v,
+                  typography: { ...v.typography, bodySizePt: Number(e.target.value) },
+                }))
+              }
+            />
+          </div>
+        </div>
+        <button
+          type="button"
+          className="btn"
+          onClick={() => onOpenAssets('fonts')}
+        >
+          + Upload Custom Fonts (.woff2 / .ttf) ({assets.fonts.length})
+        </button>
       </Section>
 
       <Section title="Custom CSS (Advanced)">

@@ -329,15 +329,17 @@ export function GitModal({
 export function AssetsModal({
   slug,
   assets,
+  initialTab = 'images',
   onClose,
   onAssetsUpdated,
 }: {
   slug: string;
   assets: AssetList;
+  initialTab?: 'images' | 'icons' | 'fonts';
   onClose: () => void;
   onAssetsUpdated: (next: AssetList) => void;
 }) {
-  const [kind, setKind] = useState<'images' | 'icons' | 'fonts'>('images');
+  const [kind, setKind] = useState<'images' | 'icons' | 'fonts'>(initialTab);
   const [busy, setBusy] = useState(false);
 
   const handleUpload = async (files: FileList | null) => {

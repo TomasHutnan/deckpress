@@ -229,6 +229,9 @@ export function renderCardsBaseCss(cardSize: CardSize, customCss = ''): string {
       justify-content: flex-start;
       z-index: 3;
     }
+    .dp-block-solid {
+      color: #FFFFFF;
+    }
     .dp-title {
       font-family: var(--dp-title-font);
       font-size: var(--dp-title-size);
