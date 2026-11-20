@@ -9,7 +9,8 @@
     "build": "vite build && tsc -p tsconfig.server.json",
     "start": "node dist/server/server/main.js",
     "test": "tsx --test src/shared/*.test.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "hash-password": "node scripts/hash-password.mjs"
   },
   "dependencies": {
     "@fastify/multipart": "^9.0.3",

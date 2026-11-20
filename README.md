@@ -10,13 +10,22 @@ Self-hosted, single-container tabletop card design studio and print-ready PDF pr
 - **Per-project Git repositories:** Each game lives in its own local Git repo under `projects/<slug>/` (gitignored from this app repo) with 1-click version saves, commit history rollback, project initialization (*Template / Blank / Clone Repo*), and optional Git remote connect/disconnect + pull/push.
 - **1-Click Print-Ready PDF Export:** Server-side WYSIWYG rendering via Alpine + system Chromium supporting custom card dimensions, bleed, **1 card per page** (exact card+bleed page size), or **sheet-packed** (A4 / A3 / Letter / Custom) with variable spacing and optional corner crop marks or full cut grid.
 
-## Quick Start (Docker — VPS / Mac / Linux)
+## Quick Start (Docker — Local & VPS)
+
+### Local
 ```bash
 cp .env.example .env
-# Optionally set DECKPRESS_PASSWORD and DECKPRESS_DATA_HOST_DIR (defaults to ~/data/deckpress)
 docker compose up -d --build
 ```
 Open `http://127.0.0.1:8080`.
+
+### VPS (`deckpress.hutnan.dev` with Caddy + Homepage)
+```bash
+cp .env.example .env
+npm run hash-password   # Paste the DECKPRESS_PASSWORD_HASH='...' line into .env
+docker compose -f compose.vps.yaml up -d --build
+```
+`compose.vps.yaml` attaches to the external `web` network with `caddy-docker-proxy` and `homepage` labels and mounts `${DECKPRESS_DATA_PATH}:/data` (owned by uid `1000`).
 
 To seed your VPS with the local `projects/the-menu` repo, copy it into `~/data/deckpress/projects/the-menu` (or clone its Git repo directly from the **+ New / Clone** button in the UI).
 

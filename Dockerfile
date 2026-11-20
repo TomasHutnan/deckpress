@@ -27,6 +27,7 @@ WORKDIR /app
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY package.json ./
+COPY scripts/hash-password.mjs ./scripts/hash-password.mjs
 RUN mkdir -p /data/projects /home/node/.cache && chown -R node:node /data /home/node/.cache
 USER node
 VOLUME /data

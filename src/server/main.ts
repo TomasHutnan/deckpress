@@ -11,6 +11,7 @@ import type {
   ExportOptions,
   ProjectConfig,
 } from '../shared/types.js';
+import { createBasicAuthVerifier } from './auth.js';
 import {
   connectRemote,
   disconnectRemote,
@@ -40,7 +41,8 @@ import { fetchProjectCards } from './sheets.js';
 const PORT = Number.parseInt(process.env.PORT || '8080', 10);
 const HOST = process.env.HOST || '0.0.0.0';
 const STATIC_DIR = process.env.DECKPRESS_STATIC_DIR || path.resolve(process.cwd(), 'dist/client');
-const ACCESS_PASSWORD = process.env.DECKPRESS_PASSWORD || '';
+const AUTH_USER = (process.env.DECKPRESS_USER || '').trim();
+const AUTH_PASSWORD_HASH = (process.env.DECKPRESS_PASSWORD_HASH || '').trim();
 
 const app = Fastify({ logger: true });
 
@@ -50,17 +52,12 @@ await app.register(multipart, {
   },
 });
 
-// Optional simple Basic Auth for VPS deployments (skips /healthz)
-if (ACCESS_PASSWORD) {
+// Optional Basic Auth using scrypt password hash (skips /healthz)
+if (AUTH_PASSWORD_HASH) {
+  const verifyBasicAuth = createBasicAuthVerifier(AUTH_USER, AUTH_PASSWORD_HASH);
   app.addHook('onRequest', async (req, reply) => {
     if (req.url === '/healthz') return;
-    const auth = req.headers.authorization;
-    if (auth && auth.startsWith('Basic ')) {
-      const decoded = Buffer.from(auth.slice(6), 'base64').toString('utf8');
-      const idx = decoded.indexOf(':');
-      const pass = idx >= 0 ? decoded.slice(idx + 1) : decoded;
-      if (pass === ACCESS_PASSWORD) return;
-    }
+    if (await verifyBasicAuth(req.headers.authorization)) return;
     reply.header('WWW-Authenticate', 'Basic realm="DeckPress"');
     return reply.code(401).send({ error: 'Authentication required' });
   });

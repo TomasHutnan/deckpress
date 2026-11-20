@@ -481,6 +481,133 @@ export function DesignPanel({
             }
           />
         </div>
+        <div className="field-row">
+          <div className="field">
+            <label>Mark Min Size (pt)</label>
+            <input
+              type="number"
+              min={6}
+              max={36}
+              value={variant.gameMark.minSizePt}
+              onChange={(e) =>
+                updateVariant((v) => ({
+                  ...v,
+                  gameMark: { ...v.gameMark, minSizePt: Number(e.target.value) },
+                }))
+              }
+            />
+          </div>
+          <div className="field">
+            <label>Mark Max Size (pt)</label>
+            <input
+              type="number"
+              min={8}
+              max={48}
+              value={variant.gameMark.maxSizePt}
+              onChange={(e) =>
+                updateVariant((v) => ({
+                  ...v,
+                  gameMark: { ...v.gameMark, maxSizePt: Number(e.target.value) },
+                }))
+              }
+            />
+          </div>
+        </div>
+        <div className="field">
+          <label>Game Mark Font Pool (randomly picked per card)</label>
+          <div className="pill-group">
+            {fontChoices.map((f) => {
+              const active = variant.gameMark.fonts.some(
+                (existing) =>
+                  existing === f.value ||
+                  existing.split(',')[0].trim() === f.value.split(',')[0].trim(),
+              );
+              return (
+                <button
+                  key={f.value}
+                  type="button"
+                  className={`pill ${active ? 'active' : ''}`}
+                  onClick={() =>
+                    updateVariant((v) => {
+                      const fam = f.value.split(',')[0].trim();
+                      const next = active
+                        ? v.gameMark.fonts.filter(
+                            (existing) =>
+                              existing !== f.value &&
+                              existing.split(',')[0].trim() !== fam,
+                          )
+                        : [...v.gameMark.fonts, f.value];
+                      return {
+                        ...v,
+                        gameMark: {
+                          ...v.gameMark,
+                          fonts: next.length > 0 ? next : [f.value],
+                        },
+                      };
+                    })
+                  }
+                >
+                  {f.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <div className="field">
+          <label>
+            Game Mark Color Pool
+            <button
+              type="button"
+              className="btn btn-xs"
+              onClick={() =>
+                updateVariant((v) => ({
+                  ...v,
+                  gameMark: {
+                    ...v.gameMark,
+                    colors: [...v.gameMark.colors, '#111111'],
+                  },
+                }))
+              }
+            >
+              + Color
+            </button>
+          </label>
+          <div className="pill-group">
+            {variant.gameMark.colors.map((hex, idx) => (
+              <div key={`${hex}-${idx}`} className="color-item">
+                <input
+                  type="color"
+                  value={hex}
+                  onChange={(e) =>
+                    updateVariant((v) => {
+                      const next = [...v.gameMark.colors];
+                      next[idx] = e.target.value;
+                      return { ...v, gameMark: { ...v.gameMark, colors: next } };
+                    })
+                  }
+                />
+                {variant.gameMark.colors.length > 1 && (
+                  <button
+                    type="button"
+                    className="btn btn-xs"
+                    title="Remove color"
+                    onClick={() =>
+                      updateVariant((v) => ({
+                        ...v,
+                        gameMark: {
+                          ...v.gameMark,
+                          colors: v.gameMark.colors.filter((_, i) => i !== idx),
+                        },
+                      }))
+                    }
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
         <div className="field">
           <label>
             Subtitle Oval Accent Chance{' '}
