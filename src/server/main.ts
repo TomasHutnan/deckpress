@@ -12,6 +12,7 @@ import type {
   ProjectConfig,
 } from '../shared/types.js';
 import { createBasicAuthVerifier } from './auth.js';
+import { getBuiltinFontsCss } from './fonts.js';
 import {
   clearProjectGitToken,
   connectRemote,
@@ -24,7 +25,7 @@ import {
 } from './git.js';
 import { renderHtmlToPdf } from './pdf.js';
 import {
-  buildCustomFontFacesCss,
+  buildInlineCustomFontFacesCss,
   createProject,
   deleteAsset,
   isAssetKind,
@@ -343,8 +344,9 @@ app.post<{
 
     // Point Chromium at local loopback so uploaded images & fonts load cleanly
     const assetBaseUrl = `http://127.0.0.1:${PORT}/api/projects/${encodeURIComponent(slug)}/assets`;
-    const [customFontFacesCss, customIconsSvg] = await Promise.all([
-      buildCustomFontFacesCss(slug, assetBaseUrl),
+    const [builtinFontsCss, customFontFacesCss, customIconsSvg] = await Promise.all([
+      getBuiltinFontsCss(),
+      buildInlineCustomFontFacesCss(slug),
       loadCustomIconsSvg(slug),
     ]);
 
@@ -355,7 +357,7 @@ app.post<{
       options: opts,
       assetBaseUrl,
       customCss: req.body.draftCustomCss ?? loaded.customCss,
-      customFontFacesCss,
+      customFontFacesCss: `${builtinFontsCss}\n${customFontFacesCss}`,
       customIconsSvg,
     });
 

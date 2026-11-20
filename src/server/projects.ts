@@ -339,24 +339,39 @@ export async function loadCustomIconsSvg(slug: string): Promise<string[]> {
   }
 }
 
-export async function buildCustomFontFacesCss(
-  slug: string,
-  assetBaseUrl: string,
-): Promise<string> {
+export async function buildInlineCustomFontFacesCss(slug: string): Promise<string> {
+  const dir = resolveProjectDir(slug);
   const assets = await listAssets(slug);
-  return assets.fonts
-    .map((file) => {
-      const family = path.parse(file).name;
-      const ext = path.extname(file).toLowerCase();
-      const format =
-        ext === '.woff2'
-          ? 'woff2'
-          : ext === '.woff'
-            ? 'woff'
-            : ext === '.otf'
-              ? 'opentype'
-              : 'truetype';
-      return `@font-face { font-family: '${family.replace(/'/g, '')}'; src: url('${assetBaseUrl}/fonts/${encodeURIComponent(file)}') format('${format}'); font-display: swap; }`;
-    })
-    .join('\n');
+  const rules: string[] = [];
+
+  for (const file of assets.fonts) {
+    const family = path.parse(file).name.replace(/'/g, '');
+    const ext = path.extname(file).toLowerCase();
+    const format =
+      ext === '.woff2'
+        ? 'woff2'
+        : ext === '.woff'
+          ? 'woff'
+          : ext === '.otf'
+            ? 'opentype'
+            : 'truetype';
+    const mime =
+      ext === '.woff2'
+        ? 'font/woff2'
+        : ext === '.woff'
+          ? 'font/woff'
+          : ext === '.otf'
+            ? 'font/otf'
+            : 'font/ttf';
+    try {
+      const buf = await fs.readFile(path.join(dir, 'assets', 'fonts', file));
+      rules.push(
+        `@font-face { font-family: '${family}'; src: url('data:${mime};base64,${buf.toString('base64')}') format('${format}'); font-display: block; }`,
+      );
+    } catch {
+      // Ignore unreadable font file
+    }
+  }
+
+  return rules.join('\n');
 }

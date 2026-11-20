@@ -164,7 +164,7 @@ function renderActionOrSpecial(
       ${recipeHtml}
     </div>
     <div class="dp-bottom-zone">
-      ${variant.divider.enabled ? renderDividerHtml(layout.dividerStyle) : ''}
+      <div class="dp-divider-slot">${variant.divider.enabled ? renderDividerHtml(layout.dividerStyle) : ''}</div>
       <div class="dp-subtitle-wrap">
         <div class="dp-subtitle">${escapeHtml(card.subtitle)}</div>
       </div>
@@ -212,10 +212,12 @@ export function renderCardHtml(
       ${renderImageLayer(card, variant, assetBaseUrl, override?.image)}
       ${renderMarkLayer(layout)}
       <div class="dp-bottom-zone">
-        ${variant.divider.enabled ? renderDividerHtml(layout.dividerStyle) : ''}
+        <div class="dp-divider-slot">${variant.divider.enabled ? renderDividerHtml(layout.dividerStyle) : ''}</div>
         <div class="dp-subtitle-wrap">
-          ${ovalSvg}
-          <div class="dp-subtitle">${escapeHtml(subtitle)}</div>
+          <div class="dp-subtitle-inner">
+            ${ovalSvg}
+            <div class="dp-subtitle">${escapeHtml(subtitle)}</div>
+          </div>
         </div>
       </div>
     `;
@@ -378,9 +380,15 @@ export function renderCardsBaseCss(cardSize: CardSize, customCss = ''): string {
       justify-content: flex-start;
       z-index: 4;
     }
+    .dp-divider-slot {
+      width: 100%;
+      height: 1.5mm;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+    }
     .dp-divider {
       width: 100%;
-      margin-bottom: 2.2mm;
     }
     .dp-divider-single {
       border-top: 0.45mm solid var(--d1, #111111);
@@ -392,11 +400,19 @@ export function renderCardsBaseCss(cardSize: CardSize, customCss = ''): string {
       box-sizing: border-box;
     }
     .dp-subtitle-wrap {
+      flex: 1;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 3mm;
+    }
+    .dp-subtitle-inner {
       position: relative;
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      padding: 0 3mm;
+      padding: 0 2mm;
     }
     .dp-subtitle {
       font-family: var(--dp-sub-font);
@@ -652,7 +668,6 @@ export function renderPrintDocumentHtml(params: {
 <head>
   <meta charset="utf-8" />
   <title>DeckPress Print</title>
-  <link rel="stylesheet" href="${GOOGLE_FONTS_LINK}" />
   <style>
     * { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; background: #FFFFFF; }
