@@ -112,9 +112,11 @@ export async function initProjectRepo(dir: string, initialMessage: string): Prom
   if (!(await isGitRepo(dir))) {
     await runGit(dir, ['init', '-b', 'main']);
   }
+  await ensureDotEnvGitignored(dir);
   await runGit(dir, ['config', 'user.name', 'DeckPress']);
   await runGit(dir, ['config', 'user.email', 'deckpress@local']);
-  await runGit(dir, ['add', '-A', '--', ':!.env']);
+  await runGit(dir, ['add', '-A']);
+  await runGit(dir, ['reset', '--', '.env']).catch(() => {});
   const status = await runGit(dir, ['status', '--porcelain']);
   if (status) {
     await runGit(dir, ['commit', '--no-gpg-sign', '-m', initialMessage]);
@@ -167,7 +169,9 @@ export async function commitAll(dir: string, message: string): Promise<boolean> 
     await initProjectRepo(dir, message);
     return true;
   }
-  await runGit(dir, ['add', '-A', '--', ':!.env']);
+  await ensureDotEnvGitignored(dir);
+  await runGit(dir, ['add', '-A']);
+  await runGit(dir, ['reset', '--', '.env']).catch(() => {});
   const status = await runGit(dir, ['status', '--porcelain']);
   if (!status) return false;
   await runGit(dir, ['commit', '--no-gpg-sign', '-m', message || 'chore: update design']);
