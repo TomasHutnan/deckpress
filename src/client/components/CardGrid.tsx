@@ -115,8 +115,16 @@ export function CardGrid({
 
       <div className="canvas-scroll">
         <div className="card-grid">
-          {visibleCards.map((card) => {
-            const { html } = renderCardHtml(card, variant, overrides, assetBaseUrl);
+          {visibleCards.map((card, idx) => {
+            const { html } = renderCardHtml(
+              card,
+              variant,
+              overrides,
+              assetBaseUrl,
+              undefined,
+              idx,
+              previewCardSize,
+            );
             const hasOverride = Boolean(overrides[card._instanceKey]);
             return (
               <div key={card._instanceKey} className="card-tile">

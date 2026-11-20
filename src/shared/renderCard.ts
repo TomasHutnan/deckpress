@@ -172,12 +172,54 @@ function renderActionOrSpecial(
   `;
 }
 
+function renderWatermarkLayer(
+  variant: DesignVariant,
+  cardIndex: number,
+  cardSize: CardSize,
+): string {
+  if (variant.canvas.mode !== 'watermark') return '';
+  const text = (variant.canvas.watermarkText || variant.gameMark.text || 'MENU').trim();
+  if (!text) return '';
+
+  const opacity = variant.canvas.watermarkOpacity ?? 0.06;
+  const color = variant.canvas.watermarkColor || '#000000';
+  const sizeMm = Math.max(8, variant.canvas.watermarkSizeMm ?? 34);
+  const angleDeg = variant.canvas.watermarkAngleDeg ?? -18;
+  const cols = Math.max(1, Math.round(variant.canvas.watermarkCols ?? 3));
+
+  const col = cardIndex % cols;
+  const row = Math.floor(cardIndex / cols);
+  const sheetX = col * cardSize.widthMm;
+  const sheetY = row * cardSize.heightMm;
+
+  // Approximate condensed uppercase word width in mm so tiles connect with clean spacing
+  const tileW = Math.max(sizeMm * 1.4, text.length * sizeMm * 0.54 + sizeMm * 0.45);
+  const tileH = sizeMm * 1.05;
+  const patId = `dp-wm-${cardIndex}`;
+  const escaped = escapeHtml(text.toUpperCase());
+
+  return `
+    <svg class="dp-watermark-layer" viewBox="${sheetX} ${sheetY} ${cardSize.widthMm} ${cardSize.heightMm}" preserveAspectRatio="none" aria-hidden="true">
+      <defs>
+        <pattern id="${patId}" patternUnits="userSpaceOnUse" width="${tileW}" height="${tileH * 2}" patternTransform="rotate(${angleDeg})">
+          <text x="0" y="${sizeMm * 0.85}" font-family="${escapeHtml(variant.typography.titleFont)}" font-size="${sizeMm}" font-weight="700" fill="${escapeHtml(color)}" fill-opacity="${opacity}" letter-spacing="0.02em">${escaped}</text>
+          <text x="${tileW / 2}" y="${tileH + sizeMm * 0.85}" font-family="${escapeHtml(variant.typography.titleFont)}" font-size="${sizeMm}" font-weight="700" fill="${escapeHtml(color)}" fill-opacity="${opacity}" letter-spacing="0.02em">${escaped}</text>
+          <text x="${-tileW / 2}" y="${tileH + sizeMm * 0.85}" font-family="${escapeHtml(variant.typography.titleFont)}" font-size="${sizeMm}" font-weight="700" fill="${escapeHtml(color)}" fill-opacity="${opacity}" letter-spacing="0.02em">${escaped}</text>
+        </pattern>
+      </defs>
+      <rect x="${sheetX}" y="${sheetY}" width="${cardSize.widthMm}" height="${cardSize.heightMm}" fill="url(#${patId})" />
+    </svg>
+  `;
+}
+
 export function renderCardHtml(
   card: ExpandedCard,
   variant: DesignVariant,
   overrides: CardOverrides,
   assetBaseUrl: string,
   customIconsSvg?: string[],
+  cardIndex = 0,
+  cardSize: CardSize = { widthMm: 63, heightMm: 88, bleedMm: 0 },
 ): { html: string; layout: ComputedCardLayout } {
   const override = overrides[card._instanceKey] ?? overrides[card.id];
   const iconCount =
@@ -186,11 +228,13 @@ export function renderCardHtml(
       : BUILTIN_FOOD_ICONS.length;
   const layout = computeCardLayout(card, variant, override, iconCount);
 
+  const watermarkHtml = renderWatermarkLayer(variant, cardIndex, cardSize);
+
   let inner = '';
   if (layout.kind === 'ingredient-dual') {
-    inner = renderDualCard(card, layout, variant);
+    inner = `${watermarkHtml}${renderDualCard(card, layout, variant)}`;
   } else if (layout.kind === 'action' || layout.kind === 'special') {
-    inner = renderActionOrSpecial(card, layout, variant);
+    inner = `${watermarkHtml}${renderActionOrSpecial(card, layout, variant)}`;
   } else {
     const isHalf = layout.kind === 'ingredient-half';
     const blockClass = isHalf ? 'dp-block-outline' : 'dp-block-solid';
@@ -204,6 +248,7 @@ export function renderCardHtml(
       : '';
 
     inner = `
+      ${watermarkHtml}
       <div class="dp-top-block ${blockClass}" style="${blockStyle}">
         <div class="dp-title">${escapeHtml(card.title)}</div>
         <div class="dp-tags" style="margin-left:${layout.tagsLeftPct}%">${escapeHtml(card.tags_str)}</div>
@@ -298,6 +343,14 @@ export function renderCardsBaseCss(cardSize: CardSize, customCss = ''): string {
       margin-top: 1.2mm;
       align-self: flex-start;
       white-space: nowrap;
+    }
+    .dp-watermark-layer {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 0;
     }
     .dp-pattern-layer {
       position: absolute;
@@ -568,7 +621,9 @@ export function renderPrintDocumentHtml(params: {
   const cardFullH = cardSize.heightMm + cardSize.bleedMm * 2;
 
   const renderedCards = cards.map(
-    (card) => renderCardHtml(card, variant, overrides, assetBaseUrl, customIconsSvg).html,
+    (card, idx) =>
+      renderCardHtml(card, variant, overrides, assetBaseUrl, customIconsSvg, idx, cardSize)
+        .html,
   );
 
   let bodyHtml = '';

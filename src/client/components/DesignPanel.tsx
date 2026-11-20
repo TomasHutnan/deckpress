@@ -253,9 +253,9 @@ export function DesignPanel({
         </div>
       </Section>
 
-      <Section title="Middle Canvas (Empty / Pattern / Art)" defaultOpen>
+      <Section title="Middle Canvas (Empty / Pattern / Watermark / Art)" defaultOpen>
         <div className="pill-group">
-          {(['empty', 'pattern', 'image'] as CanvasMode[]).map((mode) => (
+          {(['empty', 'pattern', 'watermark', 'image'] as CanvasMode[]).map((mode) => (
             <button
               key={mode}
               type="button"
@@ -268,7 +268,9 @@ export function DesignPanel({
                 ? 'Empty'
                 : mode === 'pattern'
                   ? 'Food Pattern'
-                  : 'Card Art'}
+                  : mode === 'watermark'
+                    ? 'Watermark'
+                    : 'Card Art'}
             </button>
           ))}
         </div>
@@ -335,6 +337,111 @@ export function DesignPanel({
             >
               + Upload Custom Pattern SVGs ({assets.icons.length})
             </button>
+          </>
+        )}
+        {variant.canvas.mode === 'watermark' && (
+          <>
+            <div className="field">
+              <label>Watermark Text</label>
+              <input
+                type="text"
+                value={variant.canvas.watermarkText ?? 'MENU'}
+                onChange={(e) =>
+                  updateVariant((v) => ({
+                    ...v,
+                    canvas: { ...v.canvas, watermarkText: e.target.value },
+                  }))
+                }
+              />
+            </div>
+            <div className="field">
+              <label>
+                Opacity{' '}
+                <span>{Math.round((variant.canvas.watermarkOpacity ?? 0.06) * 100)}%</span>
+              </label>
+              <input
+                type="range"
+                min={0.02}
+                max={0.25}
+                step={0.01}
+                value={variant.canvas.watermarkOpacity ?? 0.06}
+                onChange={(e) =>
+                  updateVariant((v) => ({
+                    ...v,
+                    canvas: { ...v.canvas, watermarkOpacity: Number(e.target.value) },
+                  }))
+                }
+              />
+            </div>
+            <div className="field">
+              <label>
+                Text Size <span>{variant.canvas.watermarkSizeMm ?? 34} mm</span>
+              </label>
+              <input
+                type="range"
+                min={14}
+                max={64}
+                step={1}
+                value={variant.canvas.watermarkSizeMm ?? 34}
+                onChange={(e) =>
+                  updateVariant((v) => ({
+                    ...v,
+                    canvas: { ...v.canvas, watermarkSizeMm: Number(e.target.value) },
+                  }))
+                }
+              />
+            </div>
+            <div className="field">
+              <label>
+                Angle <span>{variant.canvas.watermarkAngleDeg ?? -18}°</span>
+              </label>
+              <input
+                type="range"
+                min={-45}
+                max={45}
+                step={1}
+                value={variant.canvas.watermarkAngleDeg ?? -18}
+                onChange={(e) =>
+                  updateVariant((v) => ({
+                    ...v,
+                    canvas: { ...v.canvas, watermarkAngleDeg: Number(e.target.value) },
+                  }))
+                }
+              />
+            </div>
+            <div className="field-row">
+              <div className="field">
+                <label>Sheet Columns</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={10}
+                  value={variant.canvas.watermarkCols ?? 3}
+                  onChange={(e) =>
+                    updateVariant((v) => ({
+                      ...v,
+                      canvas: { ...v.canvas, watermarkCols: Number(e.target.value) || 3 },
+                    }))
+                  }
+                />
+              </div>
+              <div className="field">
+                <label>Color</label>
+                <div className="color-item" style={{ paddingTop: 2 }}>
+                  <input
+                    type="color"
+                    value={variant.canvas.watermarkColor ?? '#000000'}
+                    onChange={(e) =>
+                      updateVariant((v) => ({
+                        ...v,
+                        canvas: { ...v.canvas, watermarkColor: e.target.value },
+                      }))
+                    }
+                  />
+                  <span>{variant.canvas.watermarkColor ?? '#000000'}</span>
+                </div>
+              </div>
+            </div>
           </>
         )}
         {variant.canvas.mode === 'image' && (

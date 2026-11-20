@@ -21,7 +21,7 @@ export type DividerStyle =
   | 'double-grey'
   | 'oval-accent';
 
-export type CanvasMode = 'empty' | 'pattern' | 'image';
+export type CanvasMode = 'empty' | 'pattern' | 'watermark' | 'image';
 
 export interface DesignVariant {
   label: string;
@@ -67,6 +67,12 @@ export interface DesignVariant {
     patternOpacity: number;
     patternDensity: number;
     patternScale: number;
+    watermarkText?: string;
+    watermarkOpacity?: number;
+    watermarkColor?: string;
+    watermarkSizeMm?: number;
+    watermarkAngleDeg?: number;
+    watermarkCols?: number;
   };
 }
 
