@@ -44,6 +44,8 @@ export interface DesignVariant {
     maxLeftPct: number;
     minHeightPct: number;
     maxHeightPct: number;
+    tagsMinLeftPct?: number;
+    tagsMaxLeftPct?: number;
     halfBorderMm: number;
     bleedRight: boolean;
   };
@@ -127,7 +129,9 @@ export interface ComputedCardLayout {
   secondaryColor?: string;
   topBlockLeftPct: number;
   topBlockHeightPct: number;
+  tagsLeftPct: number;
   dualBottomLeftPct: number;
+  dualBottomTagsLeftPct: number;
   dividerStyle: DividerStyle;
   showOvalAccent: boolean;
   showMark: boolean;

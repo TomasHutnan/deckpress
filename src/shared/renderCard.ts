@@ -94,7 +94,7 @@ function renderDualCard(
     <div class="dp-dual-half dp-dual-top">
       <div class="dp-top-block dp-block-solid" style="left:${layout.topBlockLeftPct}%;height:26%;background:${topColor}">
         <div class="dp-title">${escapeHtml(card.title)}</div>
-        <div class="dp-tags">${escapeHtml(topTags)}</div>
+        <div class="dp-tags" style="margin-left:${layout.tagsLeftPct}%">${escapeHtml(topTags)}</div>
       </div>
       <div class="dp-dual-sub dp-dual-sub-top">${escapeHtml(sub)}</div>
     </div>
@@ -102,7 +102,7 @@ function renderDualCard(
     <div class="dp-dual-half dp-dual-bottom">
       <div class="dp-top-block dp-block-solid" style="left:${layout.dualBottomLeftPct}%;height:26%;background:${bottomColor}">
         <div class="dp-title">${escapeHtml(card.title)}</div>
-        <div class="dp-tags">${escapeHtml(bottomTags)}</div>
+        <div class="dp-tags" style="margin-left:${layout.dualBottomTagsLeftPct}%">${escapeHtml(bottomTags)}</div>
       </div>
       <div class="dp-dual-sub dp-dual-sub-top">${escapeHtml(sub)}</div>
     </div>
@@ -167,7 +167,7 @@ export function renderCardHtml(
     inner = `
       <div class="dp-top-block ${blockClass}" style="${blockStyle}">
         <div class="dp-title">${escapeHtml(card.title)}</div>
-        <div class="dp-tags">${escapeHtml(card.tags_str)}</div>
+        <div class="dp-tags" style="margin-left:${layout.tagsLeftPct}%">${escapeHtml(card.tags_str)}</div>
       </div>
       ${renderPatternLayer(layout, variant, customIconsSvg)}
       ${renderImageLayer(card, variant, assetBaseUrl, override?.image)}
@@ -255,8 +255,8 @@ export function renderCardsBaseCss(cardSize: CardSize, customCss = ''): string {
       font-weight: 300;
       letter-spacing: 0.08em;
       margin-top: 1.2mm;
-      align-self: flex-end;
-      padding-right: 2mm;
+      align-self: flex-start;
+      white-space: nowrap;
     }
     .dp-pattern-layer {
       position: absolute;

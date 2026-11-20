@@ -449,6 +449,38 @@ export function DesignPanel({
             />
           </div>
         </div>
+        <div className="field-row">
+          <div className="field">
+            <label>Tags Min Left %</label>
+            <input
+              type="number"
+              min={0}
+              max={75}
+              value={variant.topBlock.tagsMinLeftPct ?? 4}
+              onChange={(e) =>
+                updateVariant((v) => ({
+                  ...v,
+                  topBlock: { ...v.topBlock, tagsMinLeftPct: Number(e.target.value) },
+                }))
+              }
+            />
+          </div>
+          <div className="field">
+            <label>Tags Max Left %</label>
+            <input
+              type="number"
+              min={0}
+              max={80}
+              value={variant.topBlock.tagsMaxLeftPct ?? 58}
+              onChange={(e) =>
+                updateVariant((v) => ({
+                  ...v,
+                  topBlock: { ...v.topBlock, tagsMaxLeftPct: Number(e.target.value) },
+                }))
+              }
+            />
+          </div>
+        </div>
         <div className="field">
           <label>Game Mark Text (e.g. &quot;menu&quot;)</label>
           <input

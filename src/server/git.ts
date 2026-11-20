@@ -24,15 +24,16 @@ async function runGit(cwd: string, args: string[], token?: string): Promise<stri
   ];
   const finalArgs = [...safeArgs, ...authArgsForToken(token), ...args];
   try {
-    const { stdout } = await execFileAsync('git', finalArgs, {
+    const { stdout, stderr } = await execFileAsync('git', finalArgs, {
       cwd,
       env: {
         ...process.env,
+        HOME: '/tmp',
         GIT_TERMINAL_PROMPT: '0',
       },
       maxBuffer: 4 * 1024 * 1024,
     });
-    return stdout.trim();
+    return (stdout || stderr).trim();
   } catch (err: unknown) {
     const e = err as { stderr?: string; message?: string };
     const detail = (e.stderr || e.message || String(err))
@@ -232,13 +233,23 @@ export async function disconnectRemote(dir: string): Promise<void> {
 export async function pullRemote(dir: string, token?: string): Promise<string> {
   const status = await getGitStatus(dir);
   if (!status.remoteUrl) throw new Error('No Git remote is connected');
+  if (!status.remoteUrl.startsWith('http://') && !status.remoteUrl.startsWith('https://')) {
+    throw new Error('Only HTTPS remote URLs (https://github.com/...) are supported with access tokens.');
+  }
   const effectiveToken = token?.trim() || (await readProjectGitToken(dir));
-  return runGit(dir, ['pull', '--ff-only', 'origin', status.branch || 'main'], effectiveToken);
+  return runGit(
+    dir,
+    ['pull', '--rebase', '--autostash', 'origin', status.branch || 'main'],
+    effectiveToken,
+  );
 }
 
 export async function pushRemote(dir: string, token?: string): Promise<string> {
   const status = await getGitStatus(dir);
   if (!status.remoteUrl) throw new Error('No Git remote is connected');
+  if (!status.remoteUrl.startsWith('http://') && !status.remoteUrl.startsWith('https://')) {
+    throw new Error('Only HTTPS remote URLs (https://github.com/...) are supported with access tokens.');
+  }
   const effectiveToken = token?.trim() || (await readProjectGitToken(dir));
   return runGit(dir, ['push', '-u', 'origin', status.branch || 'main'], effectiveToken);
 }

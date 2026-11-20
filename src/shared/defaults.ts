@@ -57,6 +57,8 @@ export function createMenuTemplateDesign(): DesignConfig {
           maxLeftPct: 38,
           minHeightPct: 22,
           maxHeightPct: 36,
+          tagsMinLeftPct: 4,
+          tagsMaxLeftPct: 58,
           halfBorderMm: 1.6,
           bleedRight: true,
         },

@@ -359,7 +359,7 @@ app.post<{
       customIconsSvg,
     });
 
-    const pdfBuffer = await renderHtmlToPdf(html);
+    const pdfBuffer = await renderHtmlToPdf(html, req.headers.authorization);
     reply
       .header('Content-Type', 'application/pdf')
       .header(

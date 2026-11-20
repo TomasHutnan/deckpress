@@ -21,21 +21,38 @@ function findChromiumExecutable(): string {
 // Serialize PDF jobs so small VPS instances never OOM from parallel Chromium launches.
 let exportQueue: Promise<unknown> = Promise.resolve();
 
-export function renderHtmlToPdf(html: string): Promise<Buffer> {
+export function renderHtmlToPdf(
+  html: string,
+  authHeader?: string,
+): Promise<Buffer> {
   const job = exportQueue.then(async () => {
     const executablePath = findChromiumExecutable();
     const browser = await puppeteer.launch({
       executablePath,
       headless: true,
+      userDataDir: '/tmp/deckpress-chromium',
+      env: {
+        ...process.env,
+        HOME: '/tmp',
+        XDG_CONFIG_HOME: '/tmp',
+        XDG_CACHE_HOME: '/tmp',
+      },
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
         '--disable-gpu',
+        '--disable-crash-reporter',
+        '--no-first-run',
+        '--no-default-browser-check',
+        '--disable-extensions',
       ],
     });
     try {
       const page = await browser.newPage();
+      if (authHeader) {
+        await page.setExtraHTTPHeaders({ authorization: authHeader });
+      }
       await page.setContent(html, { waitUntil: 'load', timeout: 30_000 });
       await page.evaluate(async () => {
         await document.fonts.ready;

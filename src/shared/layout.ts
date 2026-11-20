@@ -103,9 +103,13 @@ export function computeCardLayout(
   const topBlockHeightPct = Math.round(
     randRange(rng, variant.topBlock.minHeightPct, variant.topBlock.maxHeightPct),
   );
+  const tagsMin = variant.topBlock.tagsMinLeftPct ?? 4;
+  const tagsMax = variant.topBlock.tagsMaxLeftPct ?? 58;
+  const tagsLeftPct = Math.round(randRange(rng, tagsMin, tagsMax));
   const dualBottomLeftPct = Math.round(
     randRange(rng, variant.topBlock.minLeftPct, Math.min(28, maxSafeLeft)),
   );
+  const dualBottomTagsLeftPct = Math.round(randRange(rng, tagsMin, tagsMax));
 
   const nonOvalStyles = variant.divider.styles.filter((s) => s !== 'oval-accent');
   const allowOval =
@@ -176,7 +180,9 @@ export function computeCardLayout(
     secondaryColor,
     topBlockLeftPct,
     topBlockHeightPct,
+    tagsLeftPct,
     dualBottomLeftPct,
+    dualBottomTagsLeftPct,
     dividerStyle,
     showOvalAccent,
     showMark,
