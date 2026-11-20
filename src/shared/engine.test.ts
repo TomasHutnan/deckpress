@@ -80,19 +80,20 @@ describe('DeckPress shared card engine', () => {
 
     const [veganSpecial] = expandCards(
       parseCsv(
-        'id,type_group,kitchen,color,size,title,subtitle,tags_str,count,image,is_action,description\n' +
-          'C96,Špeciálna,,,,VEGÁNSKY BONUS,,V BONUS,1,,2,Každý tvoj vegánsky chod sa počíta za dva body (ostáva na stole)',
+        'id,type_group,kitchen,size,title,subtitle,tags_str,count,image,is_action,description\n' +
+          'C96,Špeciálna,,,VEGÁN,ŠPECIÁLNA KARTA,V BONUS,1,,2,Vyber protihráča (ostáva na stole)',
       ),
     );
-    const specialHtml = renderCardHtml(
+    const specialRes = renderCardHtml(
       veganSpecial,
       variant,
       {},
       '/api/projects/the-menu/assets',
-    ).html;
-    assert.match(specialHtml, />V BONUS</);
-    assert.match(specialHtml, />ŠPECIÁLNA</);
-    assert.doesNotMatch(specialHtml, /OSTÁVA NA STOLE/);
+    );
+    assert.equal(specialRes.layout.primaryColor, variant.palette.default);
+    assert.match(specialRes.html, />V BONUS</);
+    assert.match(specialRes.html, /class="dp-subtitle">ŠPECIÁLNA KARTA</);
+    assert.doesNotMatch(specialRes.html, /dp-subtitle-muted/);
 
     const individualDoc = renderPrintDocumentHtml({
       cards,

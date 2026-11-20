@@ -80,7 +80,7 @@ function renderDualCard(
   layout: ComputedCardLayout,
   variant: DesignVariant,
 ): string {
-  const kitchens = card.kitchen.split('~').map((s) => s.trim());
+  const kitchens = card.kitchen.split(/[~,]/).map((s) => s.trim()).filter(Boolean);
   const topKitchen = kitchens[1] || kitchens[0] || '';
   const bottomKitchen = kitchens[0] || kitchens[1] || '';
   const isVeg = /\bV\b/.test(card.tags_str);
@@ -88,7 +88,7 @@ function renderDualCard(
   const bottomTags = `${bottomKitchen}${isVeg ? '  V' : ''}`.trim();
   const topColor = layout.secondaryColor || layout.primaryColor;
   const bottomColor = layout.primaryColor;
-  const sub = card.subtitle || card.title;
+  const sub = card.subtitle;
 
   return `
     <div class="dp-dual-half dp-dual-top">
@@ -114,9 +114,6 @@ function renderActionOrSpecial(
   layout: ComputedCardLayout,
   variant: DesignVariant,
 ): string {
-  const isAction = layout.kind === 'action';
-  const badge = isAction ? 'AKCIA' : 'ŠPECIÁLNA';
-
   return `
     <div class="dp-top-block dp-block-solid dp-block-compact" style="left:${Math.min(layout.topBlockLeftPct, 16)}%;height:26%;background:${layout.primaryColor}">
       <div class="dp-title dp-title-action">${escapeHtml(card.title)}</div>
@@ -127,7 +124,9 @@ function renderActionOrSpecial(
     </div>
     <div class="dp-bottom-zone">
       ${variant.divider.enabled ? renderDividerHtml(layout.dividerStyle) : ''}
-      <div class="dp-subtitle dp-subtitle-muted">${escapeHtml(badge)}</div>
+      <div class="dp-subtitle-wrap">
+        <div class="dp-subtitle">${escapeHtml(card.subtitle)}</div>
+      </div>
     </div>
   `;
 }
@@ -158,7 +157,7 @@ export function renderCardHtml(
       ? `left:${layout.topBlockLeftPct}%;height:${layout.topBlockHeightPct}%;border:${variant.topBlock.halfBorderMm}mm solid ${layout.primaryColor};border-right:${variant.topBlock.bleedRight ? '0' : `${variant.topBlock.halfBorderMm}mm solid ${layout.primaryColor}`};color:${layout.primaryColor};background:transparent`
       : `left:${layout.topBlockLeftPct}%;height:${layout.topBlockHeightPct}%;background:${layout.primaryColor};color:#FFFFFF`;
 
-    const subtitle = card.subtitle || card.title;
+    const subtitle = card.subtitle;
     const ovalSvg = layout.showOvalAccent
       ? `<svg class="dp-oval-accent" viewBox="0 0 140 44" preserveAspectRatio="none"><ellipse cx="70" cy="22" rx="64" ry="17" fill="none" stroke="#EF4444" stroke-width="2.2" transform="rotate(-4 70 22)"/></svg>`
       : '';

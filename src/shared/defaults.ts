@@ -39,8 +39,7 @@ export function createMenuTemplateDesign(): DesignConfig {
           IND: '#846144',
           JAP: '#DF2C14',
           UNI: '#888888',
-          Akcia: '#1C1C1C',
-          'Špeciálna': '#2D2D2D',
+          default: '#1C1C1C',
         },
         typography: {
           titleFont: "'Oswald', 'Arial Narrow', Impact, sans-serif",

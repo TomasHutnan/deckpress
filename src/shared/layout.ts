@@ -22,28 +22,25 @@ const COLOR_TO_CUISINE_ALIAS: Record<string, string> = {
   cervena: 'JAP',
   'sivá': 'UNI',
   siva: 'UNI',
-  'čierna': 'Akcia',
-  cierna: 'Akcia',
+  'čierna': 'default',
+  cierna: 'default',
 };
 
 export function resolveColor(
   key: string,
   palette: Record<string, string>,
-  fallbackKey?: string,
 ): string {
   const raw = key.trim();
   const lower = raw.toLowerCase();
   const upper = raw.toUpperCase();
   const alias = COLOR_TO_CUISINE_ALIAS[lower];
 
-  const candidates = [raw, upper, lower, alias, fallbackKey, 'Špeciálna', 'default'].filter(
-    Boolean,
-  ) as string[];
+  const candidates = [raw, upper, lower, alias, 'default'].filter(Boolean) as string[];
 
   for (const c of candidates) {
     if (palette[c]) return palette[c];
   }
-  return '#2D2D2D';
+  return '#1C1C1C';
 }
 
 export function detectCardKind(card: ExpandedCard): CardKind {
@@ -52,7 +49,11 @@ export function detectCardKind(card: ExpandedCard): CardKind {
   if (group.startsWith('špec') || group.startsWith('spec') || card.is_action === '2') {
     return 'special';
   }
-  if (card.color.includes('/') || card.kitchen.includes('~')) {
+  if (
+    card.kitchen.includes('~') ||
+    card.kitchen.includes(',') ||
+    card.color.includes('/')
+  ) {
     return 'ingredient-dual';
   }
   if (card.size.trim().toLowerCase().startsWith('pol')) {
@@ -79,15 +80,14 @@ export function computeCardLayout(
   const rng = mulberry32(effectiveSeed);
   const kind = detectCardKind(card);
 
-  const kitchenParts = card.kitchen.split('~').map((s) => s.trim()).filter(Boolean);
+  const kitchenParts = card.kitchen.split(/[~,]/).map((s) => s.trim()).filter(Boolean);
   const colorParts = card.color.split('/').map((s) => s.trim()).filter(Boolean);
-  const fallbackKey = kind === 'action' ? 'Akcia' : kind === 'special' ? 'Špeciálna' : 'UNI';
 
-  const primaryKey = kitchenParts[0] || colorParts[0] || fallbackKey;
+  const primaryKey = kitchenParts[0] || colorParts[0] || 'default';
   const secondaryKey = kitchenParts[1] || colorParts[1];
-  const primaryColor = resolveColor(primaryKey, variant.palette, fallbackKey);
+  const primaryColor = resolveColor(primaryKey, variant.palette);
   const secondaryColor = secondaryKey
-    ? resolveColor(secondaryKey, variant.palette, fallbackKey)
+    ? resolveColor(secondaryKey, variant.palette)
     : undefined;
 
   // Keep long titles from overflowing right edge by capping left offset proportionally.
