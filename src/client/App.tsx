@@ -1,0 +1,344 @@
+import React, { useEffect, useMemo, useState } from 'react';
+import type {
+  CardOverrides,
+  DesignConfig,
+  ExpandedCard,
+  ExportOptions,
+  ProjectConfig,
+} from '../shared/types';
+import { api, type LoadedProject, type ProjectSummary } from './api';
+import { CardGrid } from './components/CardGrid';
+import { DesignPanel } from './components/DesignPanel';
+import {
+  AssetsModal,
+  ExportModal,
+  GitModal,
+  NewProjectModal,
+} from './components/Modals';
+
+export function App() {
+  const [projects, setProjects] = useState<ProjectSummary[]>([]);
+  const [activeSlug, setActiveSlug] = useState<string>('');
+  const [savedProject, setSavedProject] = useState<LoadedProject | null>(null);
+
+  // Live working draft (editable without affecting saved/committed design)
+  const [draftConfig, setDraftConfig] = useState<ProjectConfig | null>(null);
+  const [draftDesign, setDraftDesign] = useState<DesignConfig | null>(null);
+  const [draftOverrides, setDraftOverrides] = useState<CardOverrides>({});
+  const [draftCustomCss, setDraftCustomCss] = useState<string>('');
+
+  const [cards, setCards] = useState<ExpandedCard[]>([]);
+  const [cardsWarning, setCardsWarning] = useState<string>('');
+  const [syncing, setSyncing] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const [modal, setModal] = useState<'none' | 'new' | 'git' | 'assets' | 'export'>('none');
+
+  const applyLoadedProject = (proj: LoadedProject) => {
+    setSavedProject(proj);
+    setDraftConfig(structuredClone(proj.config));
+    setDraftDesign(structuredClone(proj.design));
+    setDraftOverrides(structuredClone(proj.overrides));
+    setDraftCustomCss(proj.customCss);
+  };
+
+  const loadCardsFor = async (slug: string) => {
+    setSyncing(true);
+    try {
+      const res = await api.fetchCards(slug);
+      setCards(res.cards);
+      setCardsWarning(res.warning || '');
+    } catch (err: unknown) {
+      setCardsWarning(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const selectProject = async (slug: string) => {
+    setActiveSlug(slug);
+    const proj = await api.loadProject(slug);
+    applyLoadedProject(proj);
+    await loadCardsFor(slug);
+  };
+
+  const refreshProjectList = async (preferredSlug?: string) => {
+    const res = await api.listProjects();
+    setProjects(res.projects);
+    const target = preferredSlug || activeSlug || res.projects[0]?.slug || '';
+    if (target) {
+      await selectProject(target);
+    }
+  };
+
+  useEffect(() => {
+    refreshProjectList().catch(console.error);
+  }, []);
+
+  const isDirty = useMemo(() => {
+    if (!savedProject || !draftConfig || !draftDesign) return false;
+    return (
+      JSON.stringify(draftConfig) !== JSON.stringify(savedProject.config) ||
+      JSON.stringify(draftDesign) !== JSON.stringify(savedProject.design) ||
+      JSON.stringify(draftOverrides) !== JSON.stringify(savedProject.overrides) ||
+      draftCustomCss !== savedProject.customCss
+    );
+  }, [savedProject, draftConfig, draftDesign, draftOverrides, draftCustomCss]);
+
+  const handleSave = async () => {
+    if (!activeSlug || !draftConfig || !draftDesign) return;
+    const msg = prompt('Save version note (Git commit message):', 'Update card design');
+    if (msg === null) return;
+    setSaving(true);
+    try {
+      await api.saveConfig(activeSlug, draftConfig);
+      const updated = await api.saveDesign(activeSlug, {
+        design: draftDesign,
+        overrides: draftOverrides,
+        customCss: draftCustomCss,
+        commitMessage: msg.trim() || 'Update card design',
+      });
+      applyLoadedProject(updated);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDiscard = () => {
+    if (!savedProject) return;
+    if (!confirm('Discard unsaved draft changes?')) return;
+    applyLoadedProject(savedProject);
+  };
+
+  const handleSyncSheet = async () => {
+    if (!activeSlug || !draftConfig) return;
+    // Persist sheet URL first if edited, then fetch fresh cards
+    if (draftConfig.googleSheetUrl !== savedProject?.config.googleSheetUrl) {
+      await api.saveConfig(activeSlug, draftConfig, 'chore: update Google Sheet URL');
+    }
+    await loadCardsFor(activeSlug);
+  };
+
+  const handleUploadCsv = async (file: File) => {
+    if (!activeSlug) return;
+    const res = await api.uploadCsv(activeSlug, file);
+    setCards(res.cards);
+    setCardsWarning('');
+  };
+
+  const activeVariant = useMemo(() => {
+    if (!draftDesign) return null;
+    return (
+      draftDesign.variants[draftDesign.activeVariant] ||
+      Object.values(draftDesign.variants)[0] ||
+      null
+    );
+  }, [draftDesign]);
+
+  const customFontFacesCss = useMemo(() => {
+    if (!savedProject || !activeSlug) return '';
+    const base = `/api/projects/${encodeURIComponent(activeSlug)}/assets/fonts`;
+    return savedProject.assets.fonts
+      .map((file) => {
+        const family = file.replace(/\.[^.]+$/, '').replace(/'/g, '');
+        return `@font-face { font-family: '${family}'; src: url('${base}/${encodeURIComponent(file)}'); font-display: swap; }`;
+      })
+      .join('\n');
+  }, [savedProject, activeSlug]);
+
+  const typeGroups = useMemo(() => {
+    return Array.from(new Set(cards.map((c) => c.type_group).filter(Boolean)));
+  }, [cards]);
+
+  const handleExportPdf = async (options: ExportOptions) => {
+    if (!activeSlug || !activeVariant) return;
+    const blob = await api.exportPdf(activeSlug, {
+      options,
+      draftVariant: activeVariant,
+      draftOverrides,
+      draftCustomCss,
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${activeSlug}-${options.mode}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div className="studio-shell">
+      <header className="topbar">
+        <div className="topbar-left">
+          <div className="brand">
+            <span className="brand-dot" />
+            DeckPress
+          </div>
+          <select
+            value={activeSlug}
+            onChange={(e) => selectProject(e.target.value)}
+            style={{ width: 200 }}
+          >
+            {projects.length === 0 && <option value="">No projects yet</option>}
+            {projects.map((p) => (
+              <option key={p.slug} value={p.slug}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+          <button type="button" className="btn" onClick={() => setModal('new')}>
+            + New / Clone
+          </button>
+          {isDirty && <span className="draft-badge">Unsaved Draft</span>}
+        </div>
+
+        <div className="topbar-right">
+          {savedProject && (
+            <>
+              <button
+                type="button"
+                className="btn"
+                disabled={syncing}
+                onClick={handleSyncSheet}
+              >
+                {syncing ? 'Syncing...' : '↻ Sync Sheet'}
+              </button>
+              <button type="button" className="btn" onClick={() => setModal('assets')}>
+                Assets
+              </button>
+              <button type="button" className="btn" onClick={() => setModal('git')}>
+                History &amp; Git
+              </button>
+              {isDirty && (
+                <button type="button" className="btn" onClick={handleDiscard}>
+                  Revert Draft
+                </button>
+              )}
+              <button
+                type="button"
+                className="btn btn-dark"
+                disabled={!isDirty || saving}
+                onClick={handleSave}
+              >
+                {saving ? 'Saving...' : 'Save Version'}
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => setModal('export')}
+              >
+                Export PDF
+              </button>
+            </>
+          )}
+        </div>
+      </header>
+
+      {cardsWarning && <div className="banner">{cardsWarning}</div>}
+
+      {savedProject && draftConfig && draftDesign && activeVariant ? (
+        <div className="workspace">
+          <DesignPanel
+            config={draftConfig}
+            design={draftDesign}
+            customCss={draftCustomCss}
+            assets={savedProject.assets}
+            onConfigChange={setDraftConfig}
+            onDesignChange={setDraftDesign}
+            onCustomCssChange={setDraftCustomCss}
+            onSyncSheet={handleSyncSheet}
+            onUploadCsv={handleUploadCsv}
+          />
+          <CardGrid
+            slug={activeSlug}
+            cards={cards}
+            cardSize={draftConfig.cardSize}
+            variant={activeVariant}
+            overrides={draftOverrides}
+            customCss={draftCustomCss}
+            customFontFacesCss={customFontFacesCss}
+            onRerollCard={(key) =>
+              setDraftOverrides((prev) => ({
+                ...prev,
+                [key]: {
+                  ...prev[key],
+                  seed: Math.floor(Math.random() * 1_000_000),
+                },
+              }))
+            }
+            onToggleMark={(key) =>
+              setDraftOverrides((prev) => ({
+                ...prev,
+                [key]: {
+                  ...prev[key],
+                  hideMark: !prev[key]?.hideMark,
+                },
+              }))
+            }
+            onResetCard={(key) =>
+              setDraftOverrides((prev) => {
+                const next = { ...prev };
+                delete next[key];
+                return next;
+              })
+            }
+          />
+        </div>
+      ) : (
+        <div style={{ padding: 48, textAlign: 'center', color: '#6b7280' }}>
+          <h2>Welcome to DeckPress</h2>
+          <p>Create a new card game project or clone an existing Git repository to begin.</p>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => setModal('new')}
+          >
+            + Create / Clone Project
+          </button>
+        </div>
+      )}
+
+      {modal === 'new' && (
+        <NewProjectModal
+          onClose={() => setModal('none')}
+          onCreated={async (created) => {
+            setModal('none');
+            await refreshProjectList(created.config.slug);
+          }}
+        />
+      )}
+
+      {modal === 'git' && savedProject && (
+        <GitModal
+          slug={activeSlug}
+          git={savedProject.git}
+          onClose={() => setModal('none')}
+          onProjectReloaded={(p) => {
+            applyLoadedProject(p);
+            loadCardsFor(activeSlug);
+          }}
+        />
+      )}
+
+      {modal === 'assets' && savedProject && (
+        <AssetsModal
+          slug={activeSlug}
+          assets={savedProject.assets}
+          onClose={() => setModal('none')}
+          onAssetsUpdated={(nextAssets) =>
+            setSavedProject((prev) => (prev ? { ...prev, assets: nextAssets } : prev))
+          }
+        />
+      )}
+
+      {modal === 'export' && draftConfig && (
+        <ExportModal
+          cardSize={draftConfig.cardSize}
+          typeGroups={typeGroups}
+          onClose={() => setModal('none')}
+          onExport={handleExportPdf}
+        />
+      )}
+    </div>
+  );
+}

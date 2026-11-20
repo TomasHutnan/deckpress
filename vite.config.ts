@@ -1,0 +1,20 @@
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import path from 'node:path';
+
+export default defineConfig({
+  root: path.resolve(__dirname, 'src/client'),
+  plugins: [react()],
+  build: {
+    outDir: path.resolve(__dirname, 'dist/client'),
+    emptyOutDir: true,
+  },
+  server: {
+    port: 5173,
+    proxy: {
+      '/api': 'http://127.0.0.1:8080',
+      '/print': 'http://127.0.0.1:8080',
+      '/healthz': 'http://127.0.0.1:8080',
+    },
+  },
+});
