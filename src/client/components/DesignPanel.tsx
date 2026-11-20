@@ -1,10 +1,14 @@
 import React, { useState } from 'react';
+import {
+  getByPath,
+  setByPath,
+  type ControlItem,
+  type ControlsSchema,
+} from '../../shared/controls';
 import type {
   AssetList,
-  CanvasMode,
   DesignConfig,
   DesignVariant,
-  DividerStyle,
   ProjectConfig,
 } from '../../shared/types';
 import { ColorAlphaInput } from './ColorAlphaInput';
@@ -12,11 +16,10 @@ import { ColorAlphaInput } from './ColorAlphaInput';
 interface DesignPanelProps {
   config: ProjectConfig;
   design: DesignConfig;
-  customCss: string;
+  controls: ControlsSchema;
   assets: AssetList;
   onConfigChange: (next: ProjectConfig) => void;
   onDesignChange: (next: DesignConfig) => void;
-  onCustomCssChange: (next: string) => void;
   onSyncSheet: () => void;
   onUploadCsv: (file: File) => void;
   onOpenAssets: (tab: 'images' | 'icons' | 'fonts') => void;
@@ -28,15 +31,6 @@ const FONT_OPTIONS = [
   { label: 'Space Grotesk', value: "'Space Grotesk', sans-serif" },
   { label: 'Caveat (Script)', value: "'Caveat', cursive" },
   { label: 'Pacifico (Brush)', value: "'Pacifico', cursive" },
-];
-
-const ALL_DIVIDER_STYLES: { key: DividerStyle; label: string }[] = [
-  { key: 'single-black', label: 'Single Black' },
-  { key: 'double-blue', label: 'Double Blue' },
-  { key: 'double-pink', label: 'Double Pink' },
-  { key: 'red-blue', label: 'Red + Blue' },
-  { key: 'double-grey', label: 'Double Grey' },
-  { key: 'oval-accent', label: 'Red Oval Accent' },
 ];
 
 function Section({
@@ -63,11 +57,10 @@ function Section({
 export function DesignPanel({
   config,
   design,
-  customCss,
+  controls,
   assets,
   onConfigChange,
   onDesignChange,
-  onCustomCssChange,
   onSyncSheet,
   onUploadCsv,
   onOpenAssets,
@@ -83,6 +76,10 @@ export function DesignPanel({
         [activeKey]: updater(variant),
       },
     });
+  };
+
+  const setField = (path: string, value: unknown) => {
+    updateVariant((v) => setByPath(v, path, value));
   };
 
   const duplicateVariant = () => {
@@ -121,6 +118,287 @@ export function DesignPanel({
     return { label: `${name} (Uploaded)`, value: `'${name}', sans-serif` };
   });
   const fontChoices = [...FONT_OPTIONS, ...uploadedFontOptions];
+
+  const isVisible = (item: ControlItem): boolean => {
+    if (!item.showWhen) return true;
+    return getByPath(variant, item.showWhen.path) === item.showWhen.equals;
+  };
+
+  const renderControl = (item: ControlItem, idx: number): React.ReactNode => {
+    if (!isVisible(item)) return null;
+    const key = `${item.type}-${item.path || item.label || idx}`;
+
+    if (item.type === 'row') {
+      return (
+        <div key={key} className="field-row">
+          {(item.items || []).map((child, ci) => renderControl(child, ci))}
+        </div>
+      );
+    }
+
+    if (item.type === 'note') {
+      return (
+        <div key={key} style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.4 }}>
+          {item.text}
+        </div>
+      );
+    }
+
+    if (item.type === 'asset-button' && item.assetKind) {
+      const kind = item.assetKind;
+      return (
+        <button
+          key={key}
+          type="button"
+          className="btn"
+          onClick={() => onOpenAssets(kind)}
+        >
+          {item.label} ({assets[kind].length})
+        </button>
+      );
+    }
+
+    const path = item.path || '';
+    const val = getByPath(variant, path) ?? item.defaultValue;
+
+    switch (item.type) {
+      case 'text':
+        return (
+          <div key={key} className="field">
+            {item.label && <label>{item.label}</label>}
+            <input
+              type="text"
+              value={String(val ?? '')}
+              onChange={(e) => setField(path, e.target.value)}
+            />
+          </div>
+        );
+
+      case 'number':
+        return (
+          <div key={key} className="field">
+            {item.label && <label>{item.label}</label>}
+            <input
+              type="number"
+              min={item.min}
+              max={item.max}
+              step={item.step}
+              value={Number(val ?? 0)}
+              onChange={(e) => setField(path, Number(e.target.value))}
+            />
+          </div>
+        );
+
+      case 'range': {
+        const num = Number(val ?? item.min ?? 0);
+        const display = item.percent
+          ? `${Math.round(num * 100)}%`
+          : `${Number.isInteger(item.step ?? 1) ? Math.round(num) : num.toFixed(1)}${item.unit || ''}`;
+        return (
+          <div key={key} className="field">
+            <label>
+              {item.label} <span>{display}</span>
+            </label>
+            <input
+              type="range"
+              min={item.min ?? 0}
+              max={item.max ?? 100}
+              step={item.step ?? 1}
+              value={num}
+              onChange={(e) => setField(path, Number(e.target.value))}
+            />
+          </div>
+        );
+      }
+
+      case 'checkbox':
+        return (
+          <label key={key} style={{ justifyContent: 'flex-start', gap: 8, cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={Boolean(val)}
+              onChange={(e) => setField(path, e.target.checked)}
+            />
+            <span>{item.label}</span>
+          </label>
+        );
+
+      case 'seed':
+        return (
+          <div key={key} className="field-row">
+            <div className="field">
+              <label>{item.label || 'Global Seed'}</label>
+              <input
+                type="number"
+                value={Number(val ?? 0)}
+                onChange={(e) => setField(path, Number.parseInt(e.target.value, 10) || 0)}
+              />
+            </div>
+            <div className="field" style={{ justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => setField(path, Math.floor(Math.random() * 100000))}
+              >
+                🎲 Shuffle All
+              </button>
+            </div>
+          </div>
+        );
+
+      case 'select': {
+        const opts = item.preset === 'fonts' ? fontChoices : item.options || [];
+        return (
+          <div key={key} className="field">
+            {item.label && <label>{item.label}</label>}
+            <select
+              value={String(val ?? '')}
+              onChange={(e) => setField(path, e.target.value)}
+            >
+              {opts.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        );
+      }
+
+      case 'pills': {
+        const opts = item.options || [];
+        return (
+          <div key={key} className="field">
+            {item.label && <label>{item.label}</label>}
+            <div className="pill-group">
+              {opts.map((o) => (
+                <button
+                  key={o.value}
+                  type="button"
+                  className={`pill ${val === o.value ? 'active' : ''}`}
+                  onClick={() => setField(path, o.value)}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+      }
+
+      case 'multi-pills': {
+        const opts = item.preset === 'fonts' ? fontChoices : item.options || [];
+        const current = Array.isArray(val) ? (val as string[]) : [];
+        return (
+          <div key={key} className="field">
+            {item.label && <label>{item.label}</label>}
+            <div className="pill-group">
+              {opts.map((o) => {
+                const fam = o.value.split(',')[0].trim();
+                const active = current.some(
+                  (existing) =>
+                    existing === o.value ||
+                    (item.preset === 'fonts' && existing.split(',')[0].trim() === fam),
+                );
+                return (
+                  <button
+                    key={o.value}
+                    type="button"
+                    className={`pill ${active ? 'active' : ''}`}
+                    onClick={() => {
+                      const next = active
+                        ? current.filter(
+                            (existing) =>
+                              existing !== o.value &&
+                              !(item.preset === 'fonts' && existing.split(',')[0].trim() === fam),
+                          )
+                        : [...current, o.value];
+                      setField(
+                        path,
+                        item.preset === 'fonts' && next.length === 0 ? [o.value] : next,
+                      );
+                    }}
+                  >
+                    {o.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        );
+      }
+
+      case 'color':
+        return (
+          <ColorAlphaInput
+            key={key}
+            label={item.label}
+            value={String(val ?? '#000000')}
+            onChange={(hex) => setField(path, hex)}
+          />
+        );
+
+      case 'color-map': {
+        const map =
+          val && typeof val === 'object' ? (val as Record<string, string>) : {};
+        return (
+          <div key={key} className="color-grid">
+            {Object.entries(map).map(([k, hex]) => (
+              <ColorAlphaInput
+                key={k}
+                label={k}
+                value={hex}
+                onChange={(nextHex) => setField(path, { ...map, [k]: nextHex })}
+              />
+            ))}
+          </div>
+        );
+      }
+
+      case 'color-list': {
+        const list = Array.isArray(val) ? (val as string[]) : [];
+        return (
+          <div key={key} className="field">
+            <label>
+              {item.label}
+              <button
+                type="button"
+                className="btn btn-xs"
+                onClick={() => setField(path, [...list, '#111111'])}
+              >
+                + Color
+              </button>
+            </label>
+            <div className="color-grid">
+              {list.map((hex, i) => (
+                <ColorAlphaInput
+                  key={i}
+                  value={hex}
+                  onChange={(nextHex) => {
+                    const next = [...list];
+                    next[i] = nextHex;
+                    setField(path, next);
+                  }}
+                  onRemove={
+                    list.length > 1
+                      ? () =>
+                          setField(
+                            path,
+                            list.filter((_, idx2) => idx2 !== i),
+                          )
+                      : undefined
+                  }
+                />
+              ))}
+            </div>
+          </div>
+        );
+      }
+
+      default:
+        return null;
+    }
+  };
 
   return (
     <aside className="sidebar">
@@ -254,778 +532,15 @@ export function DesignPanel({
         </div>
       </Section>
 
-      <Section title="Middle Canvas (Empty / Pattern / Watermark / Art)" defaultOpen>
-        <div className="pill-group">
-          {(['empty', 'pattern', 'watermark', 'image'] as CanvasMode[]).map((mode) => (
-            <button
-              key={mode}
-              type="button"
-              className={`pill ${variant.canvas.mode === mode ? 'active' : ''}`}
-              onClick={() =>
-                updateVariant((v) => ({ ...v, canvas: { ...v.canvas, mode } }))
-              }
-            >
-              {mode === 'empty'
-                ? 'Empty'
-                : mode === 'pattern'
-                  ? 'Food Pattern'
-                  : mode === 'watermark'
-                    ? 'Watermark'
-                    : 'Card Art'}
-            </button>
-          ))}
-        </div>
-        {variant.canvas.mode === 'pattern' && (
-          <>
-            <div className="field">
-              <label>
-                Pattern Opacity <span>{Math.round(variant.canvas.patternOpacity * 100)}%</span>
-              </label>
-              <input
-                type="range"
-                min={0.02}
-                max={1}
-                step={0.01}
-                value={variant.canvas.patternOpacity}
-                onChange={(e) =>
-                  updateVariant((v) => ({
-                    ...v,
-                    canvas: { ...v.canvas, patternOpacity: Number(e.target.value) },
-                  }))
-                }
-              />
-            </div>
-            <div className="field">
-              <label>
-                Icon Count <span>{variant.canvas.patternDensity}</span>
-              </label>
-              <input
-                type="range"
-                min={4}
-                max={24}
-                step={1}
-                value={variant.canvas.patternDensity}
-                onChange={(e) =>
-                  updateVariant((v) => ({
-                    ...v,
-                    canvas: { ...v.canvas, patternDensity: Number(e.target.value) },
-                  }))
-                }
-              />
-            </div>
-            <div className="field">
-              <label>
-                Icon Scale <span>{variant.canvas.patternScale.toFixed(1)}×</span>
-              </label>
-              <input
-                type="range"
-                min={0.6}
-                max={2}
-                step={0.1}
-                value={variant.canvas.patternScale}
-                onChange={(e) =>
-                  updateVariant((v) => ({
-                    ...v,
-                    canvas: { ...v.canvas, patternScale: Number(e.target.value) },
-                  }))
-                }
-              />
-            </div>
-            <button
-              type="button"
-              className="btn"
-              onClick={() => onOpenAssets('icons')}
-            >
-              + Upload Custom Pattern SVGs ({assets.icons.length})
-            </button>
-          </>
-        )}
-        {variant.canvas.mode === 'watermark' && (
-          <>
-            <div className="field">
-              <label>Watermark Text</label>
-              <input
-                type="text"
-                value={variant.canvas.watermarkText ?? 'MENU'}
-                onChange={(e) =>
-                  updateVariant((v) => ({
-                    ...v,
-                    canvas: { ...v.canvas, watermarkText: e.target.value },
-                  }))
-                }
-              />
-            </div>
-            <div className="field">
-              <label>
-                Opacity{' '}
-                <span>{Math.round((variant.canvas.watermarkOpacity ?? 0.06) * 100)}%</span>
-              </label>
-              <input
-                type="range"
-                min={0.02}
-                max={1}
-                step={0.01}
-                value={variant.canvas.watermarkOpacity ?? 0.06}
-                onChange={(e) =>
-                  updateVariant((v) => ({
-                    ...v,
-                    canvas: { ...v.canvas, watermarkOpacity: Number(e.target.value) },
-                  }))
-                }
-              />
-            </div>
-            <div className="field-row">
-              <div className="field">
-                <label>Min Size (mm)</label>
-                <input
-                  type="number"
-                  min={8}
-                  max={80}
-                  value={variant.canvas.watermarkSizeMinMm ?? 18}
-                  onChange={(e) =>
-                    updateVariant((v) => ({
-                      ...v,
-                      canvas: { ...v.canvas, watermarkSizeMinMm: Number(e.target.value) },
-                    }))
-                  }
-                />
-              </div>
-              <div className="field">
-                <label>Max Size (mm)</label>
-                <input
-                  type="number"
-                  min={8}
-                  max={90}
-                  value={variant.canvas.watermarkSizeMaxMm ?? 44}
-                  onChange={(e) =>
-                    updateVariant((v) => ({
-                      ...v,
-                      canvas: { ...v.canvas, watermarkSizeMaxMm: Number(e.target.value) },
-                    }))
-                  }
-                />
-              </div>
-            </div>
-            <div className="field-row">
-              <div className="field">
-                <label>Min Angle (°)</label>
-                <input
-                  type="number"
-                  min={-180}
-                  max={180}
-                  value={variant.canvas.watermarkAngleMinDeg ?? -35}
-                  onChange={(e) =>
-                    updateVariant((v) => ({
-                      ...v,
-                      canvas: { ...v.canvas, watermarkAngleMinDeg: Number(e.target.value) },
-                    }))
-                  }
-                />
-              </div>
-              <div className="field">
-                <label>Max Angle (°)</label>
-                <input
-                  type="number"
-                  min={-180}
-                  max={180}
-                  value={variant.canvas.watermarkAngleMaxDeg ?? 35}
-                  onChange={(e) =>
-                    updateVariant((v) => ({
-                      ...v,
-                      canvas: { ...v.canvas, watermarkAngleMaxDeg: Number(e.target.value) },
-                    }))
-                  }
-                />
-              </div>
-            </div>
-            <div className="field">
-              <label>
-                Density (per card){' '}
-                <span>{(variant.canvas.watermarkDensity ?? 1.8).toFixed(1)}</span>
-              </label>
-              <input
-                type="range"
-                min={0.4}
-                max={6}
-                step={0.2}
-                value={variant.canvas.watermarkDensity ?? 1.8}
-                onChange={(e) =>
-                  updateVariant((v) => ({
-                    ...v,
-                    canvas: { ...v.canvas, watermarkDensity: Number(e.target.value) },
-                  }))
-                }
-              />
-            </div>
-            <label style={{ justifyContent: 'flex-start', gap: 8, cursor: 'pointer' }}>
-              <input
-                type="checkbox"
-                checked={variant.canvas.watermarkAllowOverlap ?? false}
-                onChange={(e) =>
-                  updateVariant((v) => ({
-                    ...v,
-                    canvas: { ...v.canvas, watermarkAllowOverlap: e.target.checked },
-                  }))
-                }
-              />
-              <span>Allow overlapping watermarks</span>
-            </label>
-            <div className="field">
-              <label>Sheet Columns</label>
-              <input
-                type="number"
-                min={1}
-                max={10}
-                value={variant.canvas.watermarkCols ?? 3}
-                onChange={(e) =>
-                  updateVariant((v) => ({
-                    ...v,
-                    canvas: { ...v.canvas, watermarkCols: Number(e.target.value) || 3 },
-                  }))
-                }
-              />
-            </div>
-            <div className="field">
-              <label>Watermark Color &amp; Alpha</label>
-              <ColorAlphaInput
-                value={variant.canvas.watermarkColor ?? '#000000'}
-                onChange={(hex) =>
-                  updateVariant((v) => ({
-                    ...v,
-                    canvas: { ...v.canvas, watermarkColor: hex },
-                  }))
-                }
-              />
-            </div>
-          </>
-        )}
-        {variant.canvas.mode === 'image' && (
-          <>
-            <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.4 }}>
-              Images are matched by filename from the <code>image</code> column in your
-              Google Sheet / CSV (e.g. <code>images/pesto.jpg</code> → upload{' '}
-              <code>pesto.jpg</code>).
-            </div>
-            <button
-              type="button"
-              className="btn"
-              onClick={() => onOpenAssets('images')}
-            >
-              + Upload / Manage Card Art ({assets.images.length})
-            </button>
-          </>
-        )}
-      </Section>
-
-      <Section title="Semi-Randomization Rules">
-        <div className="field-row">
-          <div className="field">
-            <label>Global Seed</label>
-            <input
-              type="number"
-              value={variant.globalSeed}
-              onChange={(e) =>
-                updateVariant((v) => ({
-                  ...v,
-                  globalSeed: Number.parseInt(e.target.value, 10) || 0,
-                }))
-              }
-            />
-          </div>
-          <div className="field" style={{ justifyContent: 'flex-end' }}>
-            <button
-              type="button"
-              className="btn"
-              onClick={() =>
-                updateVariant((v) => ({
-                  ...v,
-                  globalSeed: Math.floor(Math.random() * 100000),
-                }))
-              }
-            >
-              🎲 Shuffle All
-            </button>
-          </div>
-        </div>
-        <div className="field-row">
-          <div className="field">
-            <label>Top Box Min Left %</label>
-            <input
-              type="number"
-              min={0}
-              max={45}
-              value={variant.topBlock.minLeftPct}
-              onChange={(e) =>
-                updateVariant((v) => ({
-                  ...v,
-                  topBlock: { ...v.topBlock, minLeftPct: Number(e.target.value) },
-                }))
-              }
-            />
-          </div>
-          <div className="field">
-            <label>Top Box Max Left %</label>
-            <input
-              type="number"
-              min={0}
-              max={55}
-              value={variant.topBlock.maxLeftPct}
-              onChange={(e) =>
-                updateVariant((v) => ({
-                  ...v,
-                  topBlock: { ...v.topBlock, maxLeftPct: Number(e.target.value) },
-                }))
-              }
-            />
-          </div>
-        </div>
-        <div className="field-row">
-          <div className="field">
-            <label>Top Box Min Height %</label>
-            <input
-              type="number"
-              min={15}
-              max={45}
-              value={variant.topBlock.minHeightPct}
-              onChange={(e) =>
-                updateVariant((v) => ({
-                  ...v,
-                  topBlock: { ...v.topBlock, minHeightPct: Number(e.target.value) },
-                }))
-              }
-            />
-          </div>
-          <div className="field">
-            <label>Top Box Max Height %</label>
-            <input
-              type="number"
-              min={18}
-              max={50}
-              value={variant.topBlock.maxHeightPct}
-              onChange={(e) =>
-                updateVariant((v) => ({
-                  ...v,
-                  topBlock: { ...v.topBlock, maxHeightPct: Number(e.target.value) },
-                }))
-              }
-            />
-          </div>
-        </div>
-        <div className="field-row">
-          <div className="field">
-            <label>Tags Min Left %</label>
-            <input
-              type="number"
-              min={0}
-              max={75}
-              value={variant.topBlock.tagsMinLeftPct ?? 4}
-              onChange={(e) =>
-                updateVariant((v) => ({
-                  ...v,
-                  topBlock: { ...v.topBlock, tagsMinLeftPct: Number(e.target.value) },
-                }))
-              }
-            />
-          </div>
-          <div className="field">
-            <label>Tags Max Left %</label>
-            <input
-              type="number"
-              min={0}
-              max={80}
-              value={variant.topBlock.tagsMaxLeftPct ?? 58}
-              onChange={(e) =>
-                updateVariant((v) => ({
-                  ...v,
-                  topBlock: { ...v.topBlock, tagsMaxLeftPct: Number(e.target.value) },
-                }))
-              }
-            />
-          </div>
-        </div>
-        <div className="field">
-          <label>Game Mark Text (e.g. &quot;menu&quot;)</label>
-          <input
-            type="text"
-            value={variant.gameMark.text}
-            onChange={(e) =>
-              updateVariant((v) => ({
-                ...v,
-                gameMark: { ...v.gameMark, text: e.target.value },
-              }))
-            }
-          />
-        </div>
-        <div className="field">
-          <label>
-            Game Mark Frequency{' '}
-            <span>{Math.round(variant.gameMark.probability * 100)}%</span>
-          </label>
-          <input
-            type="range"
-            min={0}
-            max={1}
-            step={0.05}
-            value={variant.gameMark.probability}
-            onChange={(e) =>
-              updateVariant((v) => ({
-                ...v,
-                gameMark: { ...v.gameMark, probability: Number(e.target.value) },
-              }))
-            }
-          />
-        </div>
-        <div className="field-row">
-          <div className="field">
-            <label>Mark Min Size (pt)</label>
-            <input
-              type="number"
-              min={6}
-              max={36}
-              value={variant.gameMark.minSizePt}
-              onChange={(e) =>
-                updateVariant((v) => ({
-                  ...v,
-                  gameMark: { ...v.gameMark, minSizePt: Number(e.target.value) },
-                }))
-              }
-            />
-          </div>
-          <div className="field">
-            <label>Mark Max Size (pt)</label>
-            <input
-              type="number"
-              min={8}
-              max={48}
-              value={variant.gameMark.maxSizePt}
-              onChange={(e) =>
-                updateVariant((v) => ({
-                  ...v,
-                  gameMark: { ...v.gameMark, maxSizePt: Number(e.target.value) },
-                }))
-              }
-            />
-          </div>
-        </div>
-        <div className="field">
-          <label>Game Mark Font Pool (randomly picked per card)</label>
-          <div className="pill-group">
-            {fontChoices.map((f) => {
-              const active = variant.gameMark.fonts.some(
-                (existing) =>
-                  existing === f.value ||
-                  existing.split(',')[0].trim() === f.value.split(',')[0].trim(),
-              );
-              return (
-                <button
-                  key={f.value}
-                  type="button"
-                  className={`pill ${active ? 'active' : ''}`}
-                  onClick={() =>
-                    updateVariant((v) => {
-                      const fam = f.value.split(',')[0].trim();
-                      const next = active
-                        ? v.gameMark.fonts.filter(
-                            (existing) =>
-                              existing !== f.value &&
-                              existing.split(',')[0].trim() !== fam,
-                          )
-                        : [...v.gameMark.fonts, f.value];
-                      return {
-                        ...v,
-                        gameMark: {
-                          ...v.gameMark,
-                          fonts: next.length > 0 ? next : [f.value],
-                        },
-                      };
-                    })
-                  }
-                >
-                  {f.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-        <div className="field">
-          <label>
-            Game Mark Color Pool
-            <button
-              type="button"
-              className="btn btn-xs"
-              onClick={() =>
-                updateVariant((v) => ({
-                  ...v,
-                  gameMark: {
-                    ...v.gameMark,
-                    colors: [...v.gameMark.colors, '#111111'],
-                  },
-                }))
-              }
-            >
-              + Color
-            </button>
-          </label>
-          <div className="color-grid">
-            {variant.gameMark.colors.map((hex, idx) => (
-              <ColorAlphaInput
-                key={`${idx}`}
-                value={hex}
-                onChange={(nextHex) =>
-                  updateVariant((v) => {
-                    const next = [...v.gameMark.colors];
-                    next[idx] = nextHex;
-                    return { ...v, gameMark: { ...v.gameMark, colors: next } };
-                  })
-                }
-                onRemove={
-                  variant.gameMark.colors.length > 1
-                    ? () =>
-                        updateVariant((v) => ({
-                          ...v,
-                          gameMark: {
-                            ...v.gameMark,
-                            colors: v.gameMark.colors.filter((_, i) => i !== idx),
-                          },
-                        }))
-                    : undefined
-                }
-              />
-            ))}
-          </div>
-        </div>
-        <div className="field">
-          <label>
-            Subtitle Oval Accent Chance{' '}
-            <span>{Math.round(variant.divider.ovalProbability * 100)}%</span>
-          </label>
-          <input
-            type="range"
-            min={0}
-            max={0.5}
-            step={0.02}
-            value={variant.divider.ovalProbability}
-            onChange={(e) =>
-              updateVariant((v) => ({
-                ...v,
-                divider: { ...v.divider, ovalProbability: Number(e.target.value) },
-              }))
-            }
-          />
-        </div>
-        <div className="field">
-          <label>Bottom Divider Styles</label>
-          <div className="pill-group">
-            {ALL_DIVIDER_STYLES.map((st) => {
-              const active = variant.divider.styles.includes(st.key);
-              return (
-                <button
-                  key={st.key}
-                  type="button"
-                  className={`pill ${active ? 'active' : ''}`}
-                  onClick={() =>
-                    updateVariant((v) => ({
-                      ...v,
-                      divider: {
-                        ...v.divider,
-                        styles: active
-                          ? v.divider.styles.filter((s) => s !== st.key)
-                          : [...v.divider.styles, st.key],
-                      },
-                    }))
-                  }
-                >
-                  {st.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </Section>
-
-      <Section title="Colors & Kitchen Palette">
-        <div className="color-grid">
-          <ColorAlphaInput
-            label="Card BG"
-            value={variant.backgroundColor}
-            onChange={(hex) => updateVariant((v) => ({ ...v, backgroundColor: hex }))}
-          />
-          <ColorAlphaInput
-            label="Text"
-            value={variant.textColor}
-            onChange={(hex) => updateVariant((v) => ({ ...v, textColor: hex }))}
-          />
-          {Object.entries(variant.palette).map(([key, hex]) => (
-            <ColorAlphaInput
-              key={key}
-              label={key}
-              value={hex}
-              onChange={(nextHex) =>
-                updateVariant((v) => ({
-                  ...v,
-                  palette: { ...v.palette, [key]: nextHex },
-                }))
-              }
-            />
-          ))}
-        </div>
-      </Section>
-
-      <Section title="Typography">
-        <div className="field">
-          <label>Title Font</label>
-          <select
-            value={variant.typography.titleFont}
-            onChange={(e) =>
-              updateVariant((v) => ({
-                ...v,
-                typography: { ...v.typography, titleFont: e.target.value },
-              }))
-            }
-          >
-            {fontChoices.map((f) => (
-              <option key={f.value} value={f.value}>
-                {f.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="field">
-          <label>Tags Font</label>
-          <select
-            value={variant.typography.tagsFont}
-            onChange={(e) =>
-              updateVariant((v) => ({
-                ...v,
-                typography: { ...v.typography, tagsFont: e.target.value },
-              }))
-            }
-          >
-            {fontChoices.map((f) => (
-              <option key={f.value} value={f.value}>
-                {f.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="field">
-          <label>Subtitle Font</label>
-          <select
-            value={variant.typography.subtitleFont}
-            onChange={(e) =>
-              updateVariant((v) => ({
-                ...v,
-                typography: { ...v.typography, subtitleFont: e.target.value },
-              }))
-            }
-          >
-            {fontChoices.map((f) => (
-              <option key={f.value} value={f.value}>
-                {f.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="field">
-          <label>Body / Action Text Font</label>
-          <select
-            value={variant.typography.bodyFont}
-            onChange={(e) =>
-              updateVariant((v) => ({
-                ...v,
-                typography: { ...v.typography, bodyFont: e.target.value },
-              }))
-            }
-          >
-            {fontChoices.map((f) => (
-              <option key={f.value} value={f.value}>
-                {f.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="field-row">
-          <div className="field">
-            <label>Title (pt)</label>
-            <input
-              type="number"
-              min={12}
-              max={48}
-              value={variant.typography.titleSizePt}
-              onChange={(e) =>
-                updateVariant((v) => ({
-                  ...v,
-                  typography: { ...v.typography, titleSizePt: Number(e.target.value) },
-                }))
-              }
-            />
-          </div>
-          <div className="field">
-            <label>Subtitle (pt)</label>
-            <input
-              type="number"
-              min={8}
-              max={28}
-              value={variant.typography.subtitleSizePt}
-              onChange={(e) =>
-                updateVariant((v) => ({
-                  ...v,
-                  typography: { ...v.typography, subtitleSizePt: Number(e.target.value) },
-                }))
-              }
-            />
-          </div>
-        </div>
-        <div className="field-row">
-          <div className="field">
-            <label>Tags (pt)</label>
-            <input
-              type="number"
-              min={6}
-              max={22}
-              value={variant.typography.tagsSizePt}
-              onChange={(e) =>
-                updateVariant((v) => ({
-                  ...v,
-                  typography: { ...v.typography, tagsSizePt: Number(e.target.value) },
-                }))
-              }
-            />
-          </div>
-          <div className="field">
-            <label>Body (pt)</label>
-            <input
-              type="number"
-              min={7}
-              max={20}
-              step={0.5}
-              value={variant.typography.bodySizePt}
-              onChange={(e) =>
-                updateVariant((v) => ({
-                  ...v,
-                  typography: { ...v.typography, bodySizePt: Number(e.target.value) },
-                }))
-              }
-            />
-          </div>
-        </div>
-        <button
-          type="button"
-          className="btn"
-          onClick={() => onOpenAssets('fonts')}
+      {controls.map((section) => (
+        <Section
+          key={section.title}
+          title={section.title}
+          defaultOpen={section.defaultOpen}
         >
-          + Upload Custom Fonts (.woff2 / .ttf) ({assets.fonts.length})
-        </button>
-      </Section>
-
-      <Section title="Custom CSS (Advanced)">
-        <textarea
-          className="code-area"
-          value={customCss}
-          onChange={(e) => onCustomCssChange(e.target.value)}
-          placeholder="/* Live CSS overrides */"
-        />
-      </Section>
+          {section.items.map((item, idx) => renderControl(item, idx))}
+        </Section>
+      ))}
     </aside>
   );
 }

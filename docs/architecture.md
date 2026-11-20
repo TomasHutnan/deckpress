@@ -41,16 +41,18 @@ flowchart LR
 ```text
 projects/the-menu/
 ├─ .git/                 # Local Git repo (optional remote)
+├─ .env                  # Gitignored, write-only server Git token (0600)
 ├─ project.json          # Project metadata, Google Sheet URL / local CSV path, default card size
-├─ design.json           # Active variant + named variants (colors, fonts, randomization rules, canvas mode)
+├─ design.json           # Active variant + named variants (values for controls)
+├─ controls.json         # Declarative sidebar controls schema for this game
+├─ renderer.js           # Project-owned HTML/CSS/SVG card renderer (runs in browser & Chromium)
 ├─ overrides.json        # Per-card locked seeds or layout overrides keyed by card.id
 ├─ custom.css            # Optional advanced CSS escape hatch
 ├─ cards.csv             # Fallback / local snapshot of card table
-├─ assets/
-│  ├─ fonts/             # Uploaded .woff2 / .ttf fonts
-│  ├─ icons/             # Uploaded SVG food icons for procedural background patterns
-│  └─ images/            # Per-card illustrations
-└─ reference/            # Optional reference material (e.g., hand-made card photos)
+└─ assets/
+   ├─ fonts/             # Uploaded .woff2 / .ttf fonts
+   ├─ icons/             # Uploaded SVG food icons for procedural background patterns
+   └─ images/            # Per-card illustrations
 ```
 
 ### Core REST API (`server/`)
@@ -76,3 +78,4 @@ projects/the-menu/
 - [ADR-0001: Replace Jubbly with a Dedicated Single-Container Card Studio Web App](adr/0001-dedicated-card-studio-app.md)
 - [ADR-0002: Server-Side PDF Export via Alpine Linux and System Chromium](adr/0002-pdf-export-alpine-chromium.md)
 - [ADR-0003: Separate Project Storage with Local Git Versioning and Optional Remote Sync](adr/0003-project-storage-and-local-git.md)
+- [ADR-0004: Move Card Rendering Logic and Sidebar Controls into Each Project](adr/0004-project-owned-renderer-and-controls.md)

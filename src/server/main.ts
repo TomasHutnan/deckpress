@@ -3,6 +3,7 @@ import multipart from '@fastify/multipart';
 import fastifyStatic from '@fastify/static';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import type { ControlsSchema } from '../shared/controls.js';
 import { renderPrintDocumentHtml } from '../shared/renderCard.js';
 import type {
   CardOverrides,
@@ -121,6 +122,8 @@ app.put<{
   Body: {
     config?: ProjectConfig;
     design?: DesignConfig;
+    controls?: ControlsSchema;
+    rendererJs?: string;
     overrides?: CardOverrides;
     customCss?: string;
     commitMessage?: string;
@@ -323,6 +326,8 @@ app.post<{
     draftVariant?: DesignVariant;
     draftOverrides?: CardOverrides;
     draftCustomCss?: string;
+    preRenderedCardsHtml?: string[];
+    preRenderedBaseCss?: string;
   };
 }>('/api/projects/:slug/export/pdf', async (req, reply) => {
   try {
@@ -343,7 +348,8 @@ app.post<{
         : cardsRes.cards;
 
     // Point Chromium at local loopback so uploaded images & fonts load cleanly
-    const assetBaseUrl = `http://127.0.0.1:${PORT}/api/projects/${encodeURIComponent(slug)}/assets`;
+    const baseHref = `http://127.0.0.1:${PORT}/`;
+    const assetBaseUrl = `${baseHref}api/projects/${encodeURIComponent(slug)}/assets`;
     const [builtinFontsCss, customFontFacesCss, customIconsSvg] = await Promise.all([
       getBuiltinFontsCss(),
       buildInlineCustomFontFacesCss(slug),
@@ -359,6 +365,9 @@ app.post<{
       customCss: req.body.draftCustomCss ?? loaded.customCss,
       customFontFacesCss: `${builtinFontsCss}\n${customFontFacesCss}`,
       customIconsSvg,
+      preRenderedCardsHtml: req.body.preRenderedCardsHtml,
+      preRenderedBaseCss: req.body.preRenderedBaseCss,
+      baseHref,
     });
 
     const pdfBuffer = await renderHtmlToPdf(html, req.headers.authorization);

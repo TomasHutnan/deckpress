@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import type { ControlsSchema } from '../shared/controls';
+import { compileProjectRenderer } from '../shared/runtime';
 import type {
   CardOverrides,
   DesignConfig,
@@ -15,6 +17,7 @@ import {
   GitModal,
   NewProjectModal,
   SaveVersionModal,
+  TemplateModal,
 } from './components/Modals';
 
 export function App() {
@@ -25,6 +28,8 @@ export function App() {
   // Live working draft (editable without affecting saved/committed design)
   const [draftConfig, setDraftConfig] = useState<ProjectConfig | null>(null);
   const [draftDesign, setDraftDesign] = useState<DesignConfig | null>(null);
+  const [draftControls, setDraftControls] = useState<ControlsSchema>([]);
+  const [draftRendererJs, setDraftRendererJs] = useState<string>('');
   const [draftOverrides, setDraftOverrides] = useState<CardOverrides>({});
   const [draftCustomCss, setDraftCustomCss] = useState<string>('');
 
@@ -33,7 +38,7 @@ export function App() {
   const [syncing, setSyncing] = useState(false);
 
   const [modal, setModal] = useState<
-    'none' | 'new' | 'save' | 'git' | 'assets' | 'export'
+    'none' | 'new' | 'save' | 'git' | 'assets' | 'export' | 'template'
   >('none');
   const [assetsTab, setAssetsTab] = useState<'images' | 'icons' | 'fonts'>('images');
 
@@ -41,6 +46,8 @@ export function App() {
     setSavedProject(proj);
     setDraftConfig(structuredClone(proj.config));
     setDraftDesign(structuredClone(proj.design));
+    setDraftControls(structuredClone(proj.controls));
+    setDraftRendererJs(proj.rendererJs);
     setDraftOverrides(structuredClone(proj.overrides));
     setDraftCustomCss(proj.customCss);
   };
@@ -83,16 +90,28 @@ export function App() {
     return (
       JSON.stringify(draftConfig) !== JSON.stringify(savedProject.config) ||
       JSON.stringify(draftDesign) !== JSON.stringify(savedProject.design) ||
+      JSON.stringify(draftControls) !== JSON.stringify(savedProject.controls) ||
+      draftRendererJs !== savedProject.rendererJs ||
       JSON.stringify(draftOverrides) !== JSON.stringify(savedProject.overrides) ||
       draftCustomCss !== savedProject.customCss
     );
-  }, [savedProject, draftConfig, draftDesign, draftOverrides, draftCustomCss]);
+  }, [
+    savedProject,
+    draftConfig,
+    draftDesign,
+    draftControls,
+    draftRendererJs,
+    draftOverrides,
+    draftCustomCss,
+  ]);
 
   const handleSaveCommit = async (commitMessage: string, push: boolean) => {
     if (!activeSlug || !draftConfig || !draftDesign) return;
     const updated = await api.saveDesign(activeSlug, {
       config: draftConfig,
       design: draftDesign,
+      controls: draftControls,
+      rendererJs: draftRendererJs,
       overrides: draftOverrides,
       customCss: draftCustomCss,
       commitMessage,
@@ -149,11 +168,42 @@ export function App() {
 
   const handleExportPdf = async (options: ExportOptions) => {
     if (!activeSlug || !activeVariant) return;
+    const compiled = compileProjectRenderer(draftRendererJs);
+    if (compiled.error) {
+      throw new Error(`Fix renderer.js error before exporting: ${compiled.error}`);
+    }
+    const filteredCards =
+      options.filterType && options.filterType !== 'all'
+        ? cards.filter((c) => c.type_group === options.filterType)
+        : cards;
+    const exportCardSize = {
+      widthMm: options.cardWidthMm,
+      heightMm: options.cardHeightMm,
+      bleedMm: options.bleedMm,
+    };
+    const assetBaseUrl = `/api/projects/${encodeURIComponent(activeSlug)}/assets`;
+    const preRenderedCardsHtml = filteredCards.map((card, idx) =>
+      compiled.renderer.renderCard({
+        card,
+        variant: activeVariant,
+        overrides: draftOverrides,
+        assetBaseUrl,
+        cardIndex: idx,
+        cardSize: exportCardSize,
+      }),
+    );
+    const preRenderedBaseCss = compiled.renderer.getBaseCss(
+      exportCardSize,
+      draftCustomCss,
+    );
+
     const blob = await api.exportPdf(activeSlug, {
       options,
       draftVariant: activeVariant,
       draftOverrides,
       draftCustomCss,
+      preRenderedCardsHtml,
+      preRenderedBaseCss,
     });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -203,6 +253,14 @@ export function App() {
               <button type="button" className="btn" onClick={() => setModal('assets')}>
                 Assets
               </button>
+              <button
+                type="button"
+                className="btn"
+                title="Edit renderer.js, controls.json, and custom.css live"
+                onClick={() => setModal('template')}
+              >
+                &lt;/&gt; Template
+              </button>
               <button type="button" className="btn" onClick={() => setModal('git')}>
                 History &amp; Git
               </button>
@@ -238,11 +296,10 @@ export function App() {
           <DesignPanel
             config={draftConfig}
             design={draftDesign}
-            customCss={draftCustomCss}
+            controls={draftControls}
             assets={savedProject.assets}
             onConfigChange={setDraftConfig}
             onDesignChange={setDraftDesign}
-            onCustomCssChange={setDraftCustomCss}
             onSyncSheet={handleSyncSheet}
             onUploadCsv={handleUploadCsv}
             onOpenAssets={(tab) => {
@@ -255,6 +312,7 @@ export function App() {
             cards={cards}
             cardSize={draftConfig.cardSize}
             variant={activeVariant}
+            rendererJs={draftRendererJs}
             overrides={draftOverrides}
             customCss={draftCustomCss}
             customFontFacesCss={customFontFacesCss}
@@ -338,6 +396,18 @@ export function App() {
           onAssetsUpdated={(nextAssets) =>
             setSavedProject((prev) => (prev ? { ...prev, assets: nextAssets } : prev))
           }
+        />
+      )}
+
+      {modal === 'template' && savedProject && (
+        <TemplateModal
+          rendererJs={draftRendererJs}
+          controls={draftControls}
+          customCss={draftCustomCss}
+          onRendererJsChange={setDraftRendererJs}
+          onControlsChange={setDraftControls}
+          onCustomCssChange={setDraftCustomCss}
+          onClose={() => setModal('none')}
         />
       )}
 

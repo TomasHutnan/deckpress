@@ -10,6 +10,7 @@ Single source of truth for **DeckPress** (`deckpress`) — architecture, rules, 
   - [ADR-0001](docs/adr/0001-dedicated-card-studio-app.md): Dedicated single-container web app (Node/Fastify + Vite/React/TS, HTML/CSS/SVG rendering)
   - [ADR-0002](docs/adr/0002-pdf-export-alpine-chromium.md): Server-side WYSIWYG PDF export via Alpine + system Chromium (`puppeteer-core`)
   - [ADR-0003](docs/adr/0003-project-storage-and-local-git.md): Gitignored `projects/` directory with a local Git repo per project, live UI drafts, named variants, and optional Git remote sync
+  - [ADR-0004](docs/adr/0004-project-owned-renderer-and-controls.md): Per-project `renderer.js` and `controls.json` so layout, rules, and UI controls evolve without Docker rebuilds
 
 ## Commands
 - `npm test` — Run unit tests (`node --test src/shared/*.test.ts`)

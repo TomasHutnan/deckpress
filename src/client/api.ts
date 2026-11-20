@@ -1,3 +1,4 @@
+import type { ControlsSchema } from '../shared/controls';
 import type {
   AssetList,
   CardOverrides,
@@ -21,6 +22,8 @@ export interface ProjectSummary {
 export interface LoadedProject {
   config: ProjectConfig;
   design: DesignConfig;
+  controls: ControlsSchema;
+  rendererJs: string;
   overrides: CardOverrides;
   customCss: string;
   git: GitStatusInfo;
@@ -81,6 +84,8 @@ export const api = {
     payload: {
       config?: ProjectConfig;
       design?: DesignConfig;
+      controls?: ControlsSchema;
+      rendererJs?: string;
       overrides?: CardOverrides;
       customCss?: string;
       commitMessage?: string;
@@ -163,6 +168,8 @@ export const api = {
       draftVariant?: DesignVariant;
       draftOverrides?: CardOverrides;
       draftCustomCss?: string;
+      preRenderedCardsHtml?: string[];
+      preRenderedBaseCss?: string;
     },
   ): Promise<Blob> => {
     const res = await fetch(`/api/projects/${encodeURIComponent(slug)}/export/pdf`, {

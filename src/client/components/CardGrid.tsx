@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { renderCardHtml, renderCardsBaseCss } from '../../shared/renderCard';
+import { compileProjectRenderer } from '../../shared/runtime';
 import type {
   CardOverrides,
   CardSize,
@@ -12,6 +12,7 @@ interface CardGridProps {
   cards: ExpandedCard[];
   cardSize: CardSize;
   variant: DesignVariant;
+  rendererJs: string;
   overrides: CardOverrides;
   customCss: string;
   customFontFacesCss: string;
@@ -25,6 +26,7 @@ export function CardGrid({
   cards,
   cardSize,
   variant,
+  rendererJs,
   overrides,
   customCss,
   customFontFacesCss,
@@ -58,6 +60,8 @@ export function CardGrid({
     });
   }, [cards, filterType, search]);
 
+  const compiled = useMemo(() => compileProjectRenderer(rendererJs), [rendererJs]);
+
   const assetBaseUrl = `/api/projects/${encodeURIComponent(slug)}/assets`;
   // Show trim size cleanly in preview (bleed is applied automatically during PDF export)
   const previewCardSize: CardSize = {
@@ -65,18 +69,39 @@ export function CardGrid({
     heightMm: cardSize.heightMm,
     bleedMm: 0,
   };
-  const baseCss = useMemo(
-    () => `${customFontFacesCss}\n${renderCardsBaseCss(previewCardSize, customCss)}`,
-    [customFontFacesCss, previewCardSize.widthMm, previewCardSize.heightMm, customCss],
-  );
+  const { baseCss, cssError } = useMemo(() => {
+    try {
+      return {
+        baseCss: `${customFontFacesCss}\n${compiled.renderer.getBaseCss(previewCardSize, customCss)}`,
+        cssError: null as string | null,
+      };
+    } catch (err: unknown) {
+      return {
+        baseCss: customFontFacesCss,
+        cssError: err instanceof Error ? err.message : String(err),
+      };
+    }
+  }, [
+    compiled,
+    customFontFacesCss,
+    previewCardSize.widthMm,
+    previewCardSize.heightMm,
+    customCss,
+  ]);
 
   // Convert mm to CSS px at 96dpi (1mm ≈ 3.7795px) for exact scaled preview frame
   const pxW = Math.round(cardSize.widthMm * 3.779527559 * zoom);
   const pxH = Math.round(cardSize.heightMm * 3.779527559 * zoom);
+  const renderError = compiled.error || cssError;
 
   return (
     <div className="canvas-pane">
       <style>{baseCss}</style>
+      {renderError && (
+        <div className="banner">
+          <strong>renderer.js error:</strong> {renderError}
+        </div>
+      )}
       <div className="canvas-toolbar">
         <div className="pill-group">
           {typeGroups.map((t) => (
@@ -116,15 +141,20 @@ export function CardGrid({
       <div className="canvas-scroll">
         <div className="card-grid">
           {visibleCards.map((card, idx) => {
-            const { html } = renderCardHtml(
-              card,
-              variant,
-              overrides,
-              assetBaseUrl,
-              undefined,
-              idx,
-              previewCardSize,
-            );
+            let html = '';
+            try {
+              html = compiled.renderer.renderCard({
+                card,
+                variant,
+                overrides,
+                assetBaseUrl,
+                cardIndex: idx,
+                cardSize: previewCardSize,
+              });
+            } catch (err: unknown) {
+              const msg = err instanceof Error ? err.message : String(err);
+              html = `<div style="padding:12px;color:#dc2626;font-size:12px">Render error: ${msg}</div>`;
+            }
             const hasOverride = Boolean(overrides[card._instanceKey]);
             return (
               <div key={card._instanceKey} className="card-tile">

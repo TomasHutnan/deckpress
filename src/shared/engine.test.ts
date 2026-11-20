@@ -1,9 +1,11 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { createDefaultControlsSchema, getByPath, setByPath } from './controls.js';
 import { expandCards, parseCsv } from './csv.js';
 import { createMenuTemplateDesign } from './defaults.js';
 import { computeCardLayout, detectCardKind } from './layout.js';
 import { renderCardHtml, renderPrintDocumentHtml } from './renderCard.js';
+import { compileProjectRenderer } from './runtime.js';
 import { getSheetWatermarks, watermarksOverlap } from './watermark.js';
 
 describe('DeckPress shared card engine', () => {
@@ -181,5 +183,43 @@ describe('DeckPress shared card engine', () => {
     });
     assert.match(sheetDoc, /size: 210mm 297mm/);
     assert.match(sheetDoc, /dp-cut-grid/);
+  });
+
+  it('compiles project renderer.js and updates nested values via controls paths', () => {
+    const schema = createDefaultControlsSchema();
+    assert.ok(schema.length >= 4);
+
+    const obj = { canvas: { watermarkAngleMinDeg: -35 } };
+    const updated = setByPath(obj, 'canvas.watermarkAngleMinDeg', -10);
+    assert.equal(getByPath(updated, 'canvas.watermarkAngleMinDeg'), -10);
+    assert.equal(obj.canvas.watermarkAngleMinDeg, -35);
+
+    const custom = compileProjectRenderer(`
+      return {
+        renderCard(ctx) {
+          return '<div class="custom-card">' + helpers.escapeHtml(ctx.card.title) + '</div>';
+        }
+      };
+    `);
+    assert.equal(custom.error, null);
+    const variant = createMenuTemplateDesign().variants['classic-minimal'];
+    const [card] = expandCards(
+      parseCsv(
+        'id,type_group,kitchen,size,title,subtitle,tags_str,count,image,is_action,description\n' +
+          'C1,Surovina,TAL,celá,OLIVY,ČIERNE OLIVY,TAL V,1,,0,',
+      ),
+    );
+    const html = custom.renderer.renderCard({
+      card,
+      variant,
+      overrides: {},
+      assetBaseUrl: '/assets',
+      cardIndex: 0,
+      cardSize: { widthMm: 63, heightMm: 88, bleedMm: 0 },
+    });
+    assert.equal(html, '<div class="custom-card">OLIVY</div>');
+
+    const broken = compileProjectRenderer('return {{{ broken');
+    assert.ok(broken.error);
   });
 });

@@ -598,8 +598,23 @@ export function renderPrintDocumentHtml(params: {
   customCss?: string;
   customFontFacesCss?: string;
   customIconsSvg?: string[];
+  preRenderedCardsHtml?: string[];
+  preRenderedBaseCss?: string;
+  baseHref?: string;
 }): string {
-  const { cards, variant, overrides, options, assetBaseUrl, customCss = '', customFontFacesCss = '', customIconsSvg } = params;
+  const {
+    cards,
+    variant,
+    overrides,
+    options,
+    assetBaseUrl,
+    customCss = '',
+    customFontFacesCss = '',
+    customIconsSvg,
+    preRenderedCardsHtml,
+    preRenderedBaseCss,
+    baseHref,
+  } = params;
   const cardSize: CardSize = {
     widthMm: options.cardWidthMm,
     heightMm: options.cardHeightMm,
@@ -608,11 +623,21 @@ export function renderPrintDocumentHtml(params: {
   const cardFullW = cardSize.widthMm + cardSize.bleedMm * 2;
   const cardFullH = cardSize.heightMm + cardSize.bleedMm * 2;
 
-  const renderedCards = cards.map(
-    (card, idx) =>
-      renderCardHtml(card, variant, overrides, assetBaseUrl, customIconsSvg, idx, cardSize)
-        .html,
-  );
+  const renderedCards =
+    preRenderedCardsHtml && preRenderedCardsHtml.length > 0
+      ? preRenderedCardsHtml
+      : cards.map(
+          (card, idx) =>
+            renderCardHtml(
+              card,
+              variant,
+              overrides,
+              assetBaseUrl,
+              customIconsSvg,
+              idx,
+              cardSize,
+            ).html,
+        );
 
   let bodyHtml = '';
   let pageCss = '';
@@ -710,12 +735,13 @@ export function renderPrintDocumentHtml(params: {
 <html lang="sk">
 <head>
   <meta charset="utf-8" />
+  ${baseHref ? `<base href="${escapeHtml(baseHref)}" />` : ''}
   <title>DeckPress Print</title>
   <style>
     * { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; background: #FFFFFF; }
     ${customFontFacesCss}
-    ${renderCardsBaseCss(cardSize, customCss)}
+    ${preRenderedBaseCss ?? renderCardsBaseCss(cardSize, customCss)}
     ${pageCss}
   </style>
 </head>

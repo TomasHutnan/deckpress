@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import type { ControlsSchema } from '../../shared/controls';
 import type {
   AssetList,
   CardSize,
@@ -10,6 +11,141 @@ import type {
   SheetFormat,
 } from '../../shared/types';
 import { api, type LoadedProject } from '../api';
+
+/* ---------- Template & Controls Editor Modal ---------- */
+export function TemplateModal({
+  rendererJs,
+  controls,
+  customCss,
+  onRendererJsChange,
+  onControlsChange,
+  onCustomCssChange,
+  onClose,
+}: {
+  rendererJs: string;
+  controls: ControlsSchema;
+  customCss: string;
+  onRendererJsChange: (next: string) => void;
+  onControlsChange: (next: ControlsSchema) => void;
+  onCustomCssChange: (next: string) => void;
+  onClose: () => void;
+}) {
+  const [tab, setTab] = useState<'renderer' | 'controls' | 'css'>('renderer');
+  const [controlsText, setControlsText] = useState(() =>
+    JSON.stringify(controls, null, 2),
+  );
+  const [jsonError, setJsonError] = useState('');
+
+  const handleControlsEdit = (raw: string) => {
+    setControlsText(raw);
+    try {
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) {
+        setJsonError('controls.json must be a JSON array of sections.');
+        return;
+      }
+      setJsonError('');
+      onControlsChange(parsed as ControlsSchema);
+    } catch (err: unknown) {
+      setJsonError(err instanceof Error ? err.message : 'Invalid JSON');
+    }
+  };
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div
+        className="modal"
+        style={{ maxWidth: 780 }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="modal-header">
+          <h2>Project Template &amp; Controls (Live Draft)</h2>
+          <button type="button" className="btn btn-xs" onClick={onClose}>
+            ✕
+          </button>
+        </div>
+
+        <div className="pill-group">
+          <button
+            type="button"
+            className={`pill ${tab === 'renderer' ? 'active' : ''}`}
+            onClick={() => setTab('renderer')}
+          >
+            renderer.js
+          </button>
+          <button
+            type="button"
+            className={`pill ${tab === 'controls' ? 'active' : ''}`}
+            onClick={() => setTab('controls')}
+          >
+            controls.json
+          </button>
+          <button
+            type="button"
+            className={`pill ${tab === 'css' ? 'active' : ''}`}
+            onClick={() => setTab('css')}
+          >
+            custom.css
+          </button>
+        </div>
+
+        {tab === 'renderer' && (
+          <div className="field">
+            <label>
+              Project Card Renderer — changes preview live &amp; commit to the project repo
+              (no Docker rebuild needed)
+            </label>
+            <textarea
+              className="code-area"
+              style={{ minHeight: 360 }}
+              spellCheck={false}
+              value={rendererJs}
+              onChange={(e) => onRendererJsChange(e.target.value)}
+            />
+          </div>
+        )}
+
+        {tab === 'controls' && (
+          <div className="field">
+            <label>
+              Sidebar Controls Schema — add/edit sliders, color pickers, toggles, or
+              dropdowns for this game
+            </label>
+            <textarea
+              className="code-area"
+              style={{ minHeight: 360 }}
+              spellCheck={false}
+              value={controlsText}
+              onChange={(e) => handleControlsEdit(e.target.value)}
+            />
+            {jsonError && (
+              <div style={{ color: '#dc2626', fontSize: 12 }}>{jsonError}</div>
+            )}
+          </div>
+        )}
+
+        {tab === 'css' && (
+          <div className="field">
+            <label>Project Custom CSS — appended live in preview and PDF export</label>
+            <textarea
+              className="code-area"
+              style={{ minHeight: 360 }}
+              spellCheck={false}
+              value={customCss}
+              onChange={(e) => onCustomCssChange(e.target.value)}
+            />
+          </div>
+        )}
+
+        <div className="modal-footer">
+          <button type="button" className="btn btn-primary" onClick={onClose}>
+            Done (Preview Live)
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 /* ---------- Save Version Modal ---------- */
 function formatDefaultCommitMessage(): string {

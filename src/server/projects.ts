@@ -1,11 +1,16 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {
+  createDefaultControlsSchema,
+  type ControlsSchema,
+} from '../shared/controls.js';
+import {
   createBlankDesign,
   createMenuTemplateDesign,
   createStarterProjectConfig,
   STARTER_CSV,
 } from '../shared/defaults.js';
+import { DEFAULT_RENDERER_JS } from '../shared/runtime.js';
 import type {
   AssetList,
   CardOverrides,
@@ -104,6 +109,8 @@ export async function listProjects(): Promise<ProjectSummary[]> {
 export interface LoadedProject {
   config: ProjectConfig;
   design: DesignConfig;
+  controls: ControlsSchema;
+  rendererJs: string;
   overrides: CardOverrides;
   customCss: string;
   git: GitStatusInfo;
@@ -114,22 +121,28 @@ export async function loadProject(slug: string): Promise<LoadedProject> {
   const dir = resolveProjectDir(slug);
   await fs.access(dir);
 
-  const [config, design, overrides, customCss, git, assets] = await Promise.all([
-    readJsonOrDefault<ProjectConfig>(
-      path.join(dir, 'project.json'),
-      createStarterProjectConfig(slug, slug),
-    ),
-    readJsonOrDefault<DesignConfig>(
-      path.join(dir, 'design.json'),
-      createMenuTemplateDesign(),
-    ),
-    readJsonOrDefault<CardOverrides>(path.join(dir, 'overrides.json'), {}),
-    readTextOrDefault(path.join(dir, 'custom.css'), ''),
-    getGitStatus(dir),
-    listAssets(slug),
-  ]);
+  const [config, design, controls, rendererJs, overrides, customCss, git, assets] =
+    await Promise.all([
+      readJsonOrDefault<ProjectConfig>(
+        path.join(dir, 'project.json'),
+        createStarterProjectConfig(slug, slug),
+      ),
+      readJsonOrDefault<DesignConfig>(
+        path.join(dir, 'design.json'),
+        createMenuTemplateDesign(),
+      ),
+      readJsonOrDefault<ControlsSchema>(
+        path.join(dir, 'controls.json'),
+        createDefaultControlsSchema(),
+      ),
+      readTextOrDefault(path.join(dir, 'renderer.js'), DEFAULT_RENDERER_JS),
+      readJsonOrDefault<CardOverrides>(path.join(dir, 'overrides.json'), {}),
+      readTextOrDefault(path.join(dir, 'custom.css'), ''),
+      getGitStatus(dir),
+      listAssets(slug),
+    ]);
 
-  return { config, design, overrides, customCss, git, assets };
+  return { config, design, controls, rendererJs, overrides, customCss, git, assets };
 }
 
 export async function createProject(params: {
@@ -194,6 +207,11 @@ async function ensureProjectScaffold(
 
   await writeIfMissing(path.join(dir, 'project.json'), JSON.stringify(config, null, 2) + '\n');
   await writeIfMissing(path.join(dir, 'design.json'), JSON.stringify(design, null, 2) + '\n');
+  await writeIfMissing(
+    path.join(dir, 'controls.json'),
+    JSON.stringify(createDefaultControlsSchema(), null, 2) + '\n',
+  );
+  await writeIfMissing(path.join(dir, 'renderer.js'), DEFAULT_RENDERER_JS);
   await writeIfMissing(path.join(dir, 'overrides.json'), '{}\n');
   await writeIfMissing(path.join(dir, 'custom.css'), '/* Project CSS overrides */\n');
   await writeIfMissing(path.join(dir, 'cards.csv'), STARTER_CSV);
@@ -227,6 +245,8 @@ export async function saveProjectDesign(
   payload: {
     config?: ProjectConfig;
     design?: DesignConfig;
+    controls?: ControlsSchema;
+    rendererJs?: string;
     overrides?: CardOverrides;
     customCss?: string;
     commitMessage?: string;
@@ -251,6 +271,16 @@ export async function saveProjectDesign(
       JSON.stringify(payload.design, null, 2) + '\n',
       'utf8',
     );
+  }
+  if (payload.controls) {
+    await fs.writeFile(
+      path.join(dir, 'controls.json'),
+      JSON.stringify(payload.controls, null, 2) + '\n',
+      'utf8',
+    );
+  }
+  if (payload.rendererJs !== undefined) {
+    await fs.writeFile(path.join(dir, 'renderer.js'), payload.rendererJs, 'utf8');
   }
   if (payload.overrides) {
     await fs.writeFile(
