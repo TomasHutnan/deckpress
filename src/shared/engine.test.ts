@@ -78,6 +78,11 @@ describe('DeckPress shared card engine', () => {
     assert.equal(single.layout.primaryColor, variant.palette.IND);
     assert.equal(single.layout.secondaryColor, variant.palette.JAP);
 
+    const noMarkVariant = structuredClone(variant);
+    noMarkVariant.gameMark.probability = 0;
+    const dualNoMark = computeCardLayout(cards[1], noMarkVariant);
+    assert.equal(dualNoMark.showMark, false);
+
     const [veganSpecial] = expandCards(
       parseCsv(
         'id,type_group,kitchen,size,title,subtitle,tags_str,count,image,is_action,description\n' +

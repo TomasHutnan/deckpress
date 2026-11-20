@@ -123,7 +123,7 @@ export function computeCardLayout(
   const showMark =
     hasMarkText &&
     !override?.hideMark &&
-    (kind === 'ingredient-dual' || rng() < variant.gameMark.probability);
+    rng() < variant.gameMark.probability;
 
   const markFont =
     variant.gameMark.fonts.length > 0
