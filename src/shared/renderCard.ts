@@ -116,19 +116,18 @@ function renderActionOrSpecial(
 ): string {
   const isAction = layout.kind === 'action';
   const badge = isAction ? 'AKCIA' : 'ŠPECIÁLNA';
-  const staysOnTable = /ostáva na stole/i.test(card.description);
 
   return `
     <div class="dp-top-block dp-block-solid dp-block-compact" style="left:${Math.min(layout.topBlockLeftPct, 16)}%;height:26%;background:${layout.primaryColor}">
       <div class="dp-title dp-title-action">${escapeHtml(card.title)}</div>
-      <div class="dp-tags">${escapeHtml(badge)}</div>
+      ${card.tags_str ? `<div class="dp-tags" style="margin-left:${layout.tagsLeftPct}%">${escapeHtml(card.tags_str)}</div>` : ''}
     </div>
     <div class="dp-body-zone">
       <p class="dp-description">${escapeHtml(card.description)}</p>
     </div>
     <div class="dp-bottom-zone">
       ${variant.divider.enabled ? renderDividerHtml(layout.dividerStyle) : ''}
-      <div class="dp-subtitle dp-subtitle-muted">${escapeHtml(staysOnTable ? 'OSTÁVA NA STOLE' : badge)}</div>
+      <div class="dp-subtitle dp-subtitle-muted">${escapeHtml(badge)}</div>
     </div>
   `;
 }
