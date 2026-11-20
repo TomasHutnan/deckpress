@@ -244,8 +244,8 @@ input[type="range"] {
 }
 
 .color-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
+  flex-direction: column;
   gap: 8px;
 }
 
@@ -256,13 +256,42 @@ input[type="range"] {
   font-size: 12px;
 }
 
-.color-item input[type="color"] {
+.color-item input[type="color"],
+.color-alpha input[type="color"] {
   width: 28px;
   height: 24px;
   border: 1px solid #d1d5db;
   border-radius: 4px;
   padding: 0;
   cursor: pointer;
+  flex-shrink: 0;
+}
+
+.color-alpha {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  width: 100%;
+}
+
+.color-alpha-label {
+  min-width: 58px;
+  font-weight: 500;
+  color: #374151;
+}
+
+.color-alpha-slider {
+  flex: 1;
+  min-width: 60px;
+}
+
+.color-alpha-pct {
+  width: 34px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-muted);
+  flex-shrink: 0;
 }
 
 .btn {

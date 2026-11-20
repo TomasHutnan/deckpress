@@ -7,6 +7,7 @@ import type {
   DividerStyle,
   ProjectConfig,
 } from '../../shared/types';
+import { ColorAlphaInput } from './ColorAlphaInput';
 
 interface DesignPanelProps {
   config: ProjectConfig;
@@ -469,38 +470,32 @@ export function DesignPanel({
               />
               <span>Allow overlapping watermarks</span>
             </label>
-            <div className="field-row">
-              <div className="field">
-                <label>Sheet Columns</label>
-                <input
-                  type="number"
-                  min={1}
-                  max={10}
-                  value={variant.canvas.watermarkCols ?? 3}
-                  onChange={(e) =>
-                    updateVariant((v) => ({
-                      ...v,
-                      canvas: { ...v.canvas, watermarkCols: Number(e.target.value) || 3 },
-                    }))
-                  }
-                />
-              </div>
-              <div className="field">
-                <label>Color</label>
-                <div className="color-item" style={{ paddingTop: 2 }}>
-                  <input
-                    type="color"
-                    value={variant.canvas.watermarkColor ?? '#000000'}
-                    onChange={(e) =>
-                      updateVariant((v) => ({
-                        ...v,
-                        canvas: { ...v.canvas, watermarkColor: e.target.value },
-                      }))
-                    }
-                  />
-                  <span>{variant.canvas.watermarkColor ?? '#000000'}</span>
-                </div>
-              </div>
+            <div className="field">
+              <label>Sheet Columns</label>
+              <input
+                type="number"
+                min={1}
+                max={10}
+                value={variant.canvas.watermarkCols ?? 3}
+                onChange={(e) =>
+                  updateVariant((v) => ({
+                    ...v,
+                    canvas: { ...v.canvas, watermarkCols: Number(e.target.value) || 3 },
+                  }))
+                }
+              />
+            </div>
+            <div className="field">
+              <label>Watermark Color &amp; Alpha</label>
+              <ColorAlphaInput
+                value={variant.canvas.watermarkColor ?? '#000000'}
+                onChange={(hex) =>
+                  updateVariant((v) => ({
+                    ...v,
+                    canvas: { ...v.canvas, watermarkColor: hex },
+                  }))
+                }
+              />
             </div>
           </>
         )}
@@ -771,39 +766,31 @@ export function DesignPanel({
               + Color
             </button>
           </label>
-          <div className="pill-group">
+          <div className="color-grid">
             {variant.gameMark.colors.map((hex, idx) => (
-              <div key={`${hex}-${idx}`} className="color-item">
-                <input
-                  type="color"
-                  value={hex}
-                  onChange={(e) =>
-                    updateVariant((v) => {
-                      const next = [...v.gameMark.colors];
-                      next[idx] = e.target.value;
-                      return { ...v, gameMark: { ...v.gameMark, colors: next } };
-                    })
-                  }
-                />
-                {variant.gameMark.colors.length > 1 && (
-                  <button
-                    type="button"
-                    className="btn btn-xs"
-                    title="Remove color"
-                    onClick={() =>
-                      updateVariant((v) => ({
-                        ...v,
-                        gameMark: {
-                          ...v.gameMark,
-                          colors: v.gameMark.colors.filter((_, i) => i !== idx),
-                        },
-                      }))
-                    }
-                  >
-                    ×
-                  </button>
-                )}
-              </div>
+              <ColorAlphaInput
+                key={`${idx}`}
+                value={hex}
+                onChange={(nextHex) =>
+                  updateVariant((v) => {
+                    const next = [...v.gameMark.colors];
+                    next[idx] = nextHex;
+                    return { ...v, gameMark: { ...v.gameMark, colors: next } };
+                  })
+                }
+                onRemove={
+                  variant.gameMark.colors.length > 1
+                    ? () =>
+                        updateVariant((v) => ({
+                          ...v,
+                          gameMark: {
+                            ...v.gameMark,
+                            colors: v.gameMark.colors.filter((_, i) => i !== idx),
+                          },
+                        }))
+                    : undefined
+                }
+              />
             ))}
           </div>
         </div>
@@ -858,40 +845,28 @@ export function DesignPanel({
 
       <Section title="Colors & Kitchen Palette">
         <div className="color-grid">
-          <div className="color-item">
-            <input
-              type="color"
-              value={variant.backgroundColor}
-              onChange={(e) =>
-                updateVariant((v) => ({ ...v, backgroundColor: e.target.value }))
-              }
-            />
-            <span>Card BG</span>
-          </div>
-          <div className="color-item">
-            <input
-              type="color"
-              value={variant.textColor}
-              onChange={(e) =>
-                updateVariant((v) => ({ ...v, textColor: e.target.value }))
-              }
-            />
-            <span>Text</span>
-          </div>
+          <ColorAlphaInput
+            label="Card BG"
+            value={variant.backgroundColor}
+            onChange={(hex) => updateVariant((v) => ({ ...v, backgroundColor: hex }))}
+          />
+          <ColorAlphaInput
+            label="Text"
+            value={variant.textColor}
+            onChange={(hex) => updateVariant((v) => ({ ...v, textColor: hex }))}
+          />
           {Object.entries(variant.palette).map(([key, hex]) => (
-            <div key={key} className="color-item">
-              <input
-                type="color"
-                value={hex}
-                onChange={(e) =>
-                  updateVariant((v) => ({
-                    ...v,
-                    palette: { ...v.palette, [key]: e.target.value },
-                  }))
-                }
-              />
-              <span>{key}</span>
-            </div>
+            <ColorAlphaInput
+              key={key}
+              label={key}
+              value={hex}
+              onChange={(nextHex) =>
+                updateVariant((v) => ({
+                  ...v,
+                  palette: { ...v.palette, [key]: nextHex },
+                }))
+              }
+            />
           ))}
         </div>
       </Section>
