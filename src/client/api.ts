@@ -79,10 +79,12 @@ export const api = {
   saveDesign: (
     slug: string,
     payload: {
+      config?: ProjectConfig;
       design?: DesignConfig;
       overrides?: CardOverrides;
       customCss?: string;
       commitMessage?: string;
+      push?: boolean;
     },
   ) =>
     jsonFetch<LoadedProject>(`/api/projects/${encodeURIComponent(slug)}/design`, {

@@ -11,6 +11,91 @@ import type {
 } from '../../shared/types';
 import { api, type LoadedProject } from '../api';
 
+/* ---------- Save Version Modal ---------- */
+function formatDefaultCommitMessage(): string {
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `Update ${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+}
+
+export function SaveVersionModal({
+  canPush,
+  onClose,
+  onSave,
+}: {
+  canPush: boolean;
+  onClose: () => void;
+  onSave: (commitMessage: string, push: boolean) => Promise<void>;
+}) {
+  const [message, setMessage] = useState(formatDefaultCommitMessage);
+  const [push, setPush] = useState(canPush);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError('');
+    try {
+      await onSave(message.trim() || formatDefaultCommitMessage(), canPush && push);
+      onClose();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <form className="modal" onClick={(e) => e.stopPropagation()} onSubmit={handleSubmit}>
+        <div className="modal-header">
+          <h2>Save Version</h2>
+          <button type="button" className="btn btn-xs" onClick={onClose}>
+            ✕
+          </button>
+        </div>
+
+        <div className="field">
+          <label>Version Note (Git Commit Message)</label>
+          <input
+            type="text"
+            autoFocus
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+          />
+        </div>
+
+        {canPush && (
+          <label style={{ justifyContent: 'flex-start', gap: 8, cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={push}
+              onChange={(e) => setPush(e.target.checked)}
+            />
+            <span>Also push commit to connected Git remote</span>
+          </label>
+        )}
+
+        {error && (
+          <div style={{ color: '#dc2626', fontSize: 12, whiteSpace: 'pre-wrap' }}>
+            {error}
+          </div>
+        )}
+
+        <div className="modal-footer">
+          <button type="button" className="btn" onClick={onClose} disabled={busy}>
+            Cancel
+          </button>
+          <button type="submit" className="btn btn-dark" disabled={busy}>
+            {busy ? (push && canPush ? 'Saving & Pushing...' : 'Saving...') : 'Save Version'}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 /* ---------- New Project Modal ---------- */
 export function NewProjectModal({
   onClose,

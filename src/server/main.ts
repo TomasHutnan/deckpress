@@ -118,14 +118,20 @@ app.put<{
 app.put<{
   Params: { slug: string };
   Body: {
+    config?: ProjectConfig;
     design?: DesignConfig;
     overrides?: CardOverrides;
     customCss?: string;
     commitMessage?: string;
+    push?: boolean;
   };
 }>('/api/projects/:slug/design', async (req, reply) => {
   try {
     await saveProjectDesign(req.params.slug, req.body);
+    if (req.body.push) {
+      const dir = resolveProjectDir(req.params.slug);
+      await pushRemote(dir);
+    }
     return await loadProject(req.params.slug);
   } catch (err: unknown) {
     return reply.code(400).send({ error: err instanceof Error ? err.message : String(err) });

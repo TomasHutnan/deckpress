@@ -14,16 +14,32 @@ function authArgsForToken(token?: string): string[] {
 }
 
 async function runGit(cwd: string, args: string[], token?: string): Promise<string> {
-  const finalArgs = [...authArgsForToken(token), ...args];
-  const { stdout } = await execFileAsync('git', finalArgs, {
-    cwd,
-    env: {
-      ...process.env,
-      GIT_TERMINAL_PROMPT: '0',
-    },
-    maxBuffer: 4 * 1024 * 1024,
-  });
-  return stdout.trim();
+  const safeArgs = [
+    '-c',
+    'safe.directory=*',
+    '-c',
+    'user.name=DeckPress',
+    '-c',
+    'user.email=deckpress@local',
+  ];
+  const finalArgs = [...safeArgs, ...authArgsForToken(token), ...args];
+  try {
+    const { stdout } = await execFileAsync('git', finalArgs, {
+      cwd,
+      env: {
+        ...process.env,
+        GIT_TERMINAL_PROMPT: '0',
+      },
+      maxBuffer: 4 * 1024 * 1024,
+    });
+    return stdout.trim();
+  } catch (err: unknown) {
+    const e = err as { stderr?: string; message?: string };
+    const detail = (e.stderr || e.message || String(err))
+      .replace(/AUTHORIZATION: Basic [^\s'"]+/gi, 'AUTHORIZATION: Basic [REDACTED]')
+      .trim();
+    throw new Error(detail || 'Git command failed');
+  }
 }
 
 const PROJECT_ENV_FILE = '.env';

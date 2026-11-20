@@ -225,6 +225,7 @@ export async function saveProjectConfig(
 export async function saveProjectDesign(
   slug: string,
   payload: {
+    config?: ProjectConfig;
     design?: DesignConfig;
     overrides?: CardOverrides;
     customCss?: string;
@@ -232,6 +233,18 @@ export async function saveProjectDesign(
   },
 ): Promise<void> {
   const dir = resolveProjectDir(slug);
+  if (payload.config) {
+    const safeConfig: ProjectConfig = {
+      ...payload.config,
+      slug,
+      localCsv: payload.config.localCsv || 'cards.csv',
+    };
+    await fs.writeFile(
+      path.join(dir, 'project.json'),
+      JSON.stringify(safeConfig, null, 2) + '\n',
+      'utf8',
+    );
+  }
   if (payload.design) {
     await fs.writeFile(
       path.join(dir, 'design.json'),

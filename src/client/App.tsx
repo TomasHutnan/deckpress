@@ -14,6 +14,7 @@ import {
   ExportModal,
   GitModal,
   NewProjectModal,
+  SaveVersionModal,
 } from './components/Modals';
 
 export function App() {
@@ -30,9 +31,10 @@ export function App() {
   const [cards, setCards] = useState<ExpandedCard[]>([]);
   const [cardsWarning, setCardsWarning] = useState<string>('');
   const [syncing, setSyncing] = useState(false);
-  const [saving, setSaving] = useState(false);
 
-  const [modal, setModal] = useState<'none' | 'new' | 'git' | 'assets' | 'export'>('none');
+  const [modal, setModal] = useState<
+    'none' | 'new' | 'save' | 'git' | 'assets' | 'export'
+  >('none');
   const [assetsTab, setAssetsTab] = useState<'images' | 'icons' | 'fonts'>('images');
 
   const applyLoadedProject = (proj: LoadedProject) => {
@@ -86,23 +88,17 @@ export function App() {
     );
   }, [savedProject, draftConfig, draftDesign, draftOverrides, draftCustomCss]);
 
-  const handleSave = async () => {
+  const handleSaveCommit = async (commitMessage: string, push: boolean) => {
     if (!activeSlug || !draftConfig || !draftDesign) return;
-    const msg = prompt('Save version note (Git commit message):', 'Update card design');
-    if (msg === null) return;
-    setSaving(true);
-    try {
-      await api.saveConfig(activeSlug, draftConfig);
-      const updated = await api.saveDesign(activeSlug, {
-        design: draftDesign,
-        overrides: draftOverrides,
-        customCss: draftCustomCss,
-        commitMessage: msg.trim() || 'Update card design',
-      });
-      applyLoadedProject(updated);
-    } finally {
-      setSaving(false);
-    }
+    const updated = await api.saveDesign(activeSlug, {
+      config: draftConfig,
+      design: draftDesign,
+      overrides: draftOverrides,
+      customCss: draftCustomCss,
+      commitMessage,
+      push,
+    });
+    applyLoadedProject(updated);
   };
 
   const handleDiscard = () => {
@@ -218,10 +214,10 @@ export function App() {
               <button
                 type="button"
                 className="btn btn-dark"
-                disabled={!isDirty || saving}
-                onClick={handleSave}
+                disabled={!isDirty && !savedProject.git.dirty}
+                onClick={() => setModal('save')}
               >
-                {saving ? 'Saving...' : 'Save Version'}
+                Save Version
               </button>
               <button
                 type="button"
@@ -310,6 +306,14 @@ export function App() {
             setModal('none');
             await refreshProjectList(created.config.slug);
           }}
+        />
+      )}
+
+      {modal === 'save' && savedProject && (
+        <SaveVersionModal
+          canPush={Boolean(savedProject.git.remoteUrl && savedProject.git.hasSavedToken)}
+          onClose={() => setModal('none')}
+          onSave={handleSaveCommit}
         />
       )}
 
