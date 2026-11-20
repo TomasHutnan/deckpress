@@ -1,8 +1,8 @@
 # Single-container DeckPress image: built React Studio UI + Fastify server + Alpine system Chromium & Git.
 FROM --platform=$BUILDPLATFORM node:20-alpine AS build
 WORKDIR /app
-COPY package.json package-lock.json* ./
-RUN npm install --ignore-scripts
+COPY package.json package-lock.json ./
+RUN npm ci --ignore-scripts
 COPY tsconfig.json tsconfig.server.json vite.config.ts ./
 COPY src ./src
 RUN npm run build && npm prune --omit=dev
