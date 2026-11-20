@@ -14,23 +14,26 @@ import { api, type LoadedProject } from '../api';
 
 /* ---------- Template & Controls Editor Modal ---------- */
 export function TemplateModal({
-  rendererJs,
+  templateFiles,
   controls,
   customCss,
-  onRendererJsChange,
+  onTemplateFilesChange,
   onControlsChange,
   onCustomCssChange,
   onClose,
 }: {
-  rendererJs: string;
+  templateFiles: Record<string, string>;
   controls: ControlsSchema;
   customCss: string;
-  onRendererJsChange: (next: string) => void;
+  onTemplateFilesChange: (next: Record<string, string>) => void;
   onControlsChange: (next: ControlsSchema) => void;
   onCustomCssChange: (next: string) => void;
   onClose: () => void;
 }) {
-  const [tab, setTab] = useState<'renderer' | 'controls' | 'css'>('renderer');
+  const fileNames = Object.keys(templateFiles).sort((a, b) =>
+    a === 'index.js' ? -1 : b === 'index.js' ? 1 : a.localeCompare(b),
+  );
+  const [activeTab, setActiveTab] = useState<string>(fileNames[0] || 'controls.json');
   const [controlsText, setControlsText] = useState(() =>
     JSON.stringify(controls, null, 2),
   );
@@ -51,69 +54,87 @@ export function TemplateModal({
     }
   };
 
+  const handleAddFile = () => {
+    const raw = prompt('New template filename (e.g. helpers.js or extra.css):');
+    if (!raw?.trim()) return;
+    const name = raw.trim();
+    if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]*\.(js|css)$/.test(name)) {
+      alert('Filename must use letters/numbers/._- and end in .js or .css');
+      return;
+    }
+    if (templateFiles[name] !== undefined) {
+      setActiveTab(name);
+      return;
+    }
+    const starter = name.endsWith('.css')
+      ? `/* ${name} */\n`
+      : `// ${name} — load from index.js via require('./${name}')\nreturn {};\n`;
+    onTemplateFilesChange({ ...templateFiles, [name]: starter });
+    setActiveTab(name);
+  };
+
+  const handleDeleteFile = (name: string) => {
+    if (name === 'index.js') return;
+    if (!confirm(`Delete template/${name}?`)) return;
+    const next = { ...templateFiles };
+    delete next[name];
+    onTemplateFilesChange(next);
+    setActiveTab('index.js');
+  };
+
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div
         className="modal"
-        style={{ maxWidth: 780 }}
+        style={{ maxWidth: 860 }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="modal-header">
-          <h2>Project Template &amp; Controls (Live Draft)</h2>
+          <h2>Project Template Folder &amp; Controls (Live Draft)</h2>
           <button type="button" className="btn btn-xs" onClick={onClose}>
             ✕
           </button>
         </div>
 
         <div className="pill-group">
+          {fileNames.map((name) => (
+            <button
+              key={name}
+              type="button"
+              className={`pill ${activeTab === name ? 'active' : ''}`}
+              onClick={() => setActiveTab(name)}
+            >
+              template/{name}
+            </button>
+          ))}
           <button
             type="button"
-            className={`pill ${tab === 'renderer' ? 'active' : ''}`}
-            onClick={() => setTab('renderer')}
-          >
-            renderer.js
-          </button>
-          <button
-            type="button"
-            className={`pill ${tab === 'controls' ? 'active' : ''}`}
-            onClick={() => setTab('controls')}
+            className={`pill ${activeTab === 'controls.json' ? 'active' : ''}`}
+            onClick={() => setActiveTab('controls.json')}
           >
             controls.json
           </button>
           <button
             type="button"
-            className={`pill ${tab === 'css' ? 'active' : ''}`}
-            onClick={() => setTab('css')}
+            className={`pill ${activeTab === 'custom.css' ? 'active' : ''}`}
+            onClick={() => setActiveTab('custom.css')}
           >
             custom.css
           </button>
+          <button type="button" className="btn btn-xs" onClick={handleAddFile}>
+            + File
+          </button>
         </div>
 
-        {tab === 'renderer' && (
-          <div className="field">
-            <label>
-              Project Card Renderer — changes preview live &amp; commit to the project repo
-              (no Docker rebuild needed)
-            </label>
-            <textarea
-              className="code-area"
-              style={{ minHeight: 360 }}
-              spellCheck={false}
-              value={rendererJs}
-              onChange={(e) => onRendererJsChange(e.target.value)}
-            />
-          </div>
-        )}
-
-        {tab === 'controls' && (
+        {activeTab === 'controls.json' ? (
           <div className="field">
             <label>
               Sidebar Controls Schema — add/edit sliders, color pickers, toggles, or
-              dropdowns for this game
+              dropdowns
             </label>
             <textarea
               className="code-area"
-              style={{ minHeight: 360 }}
+              style={{ minHeight: 400 }}
               spellCheck={false}
               value={controlsText}
               onChange={(e) => handleControlsEdit(e.target.value)}
@@ -122,17 +143,44 @@ export function TemplateModal({
               <div style={{ color: '#dc2626', fontSize: 12 }}>{jsonError}</div>
             )}
           </div>
-        )}
-
-        {tab === 'css' && (
+        ) : activeTab === 'custom.css' ? (
           <div className="field">
             <label>Project Custom CSS — appended live in preview and PDF export</label>
             <textarea
               className="code-area"
-              style={{ minHeight: 360 }}
+              style={{ minHeight: 400 }}
               spellCheck={false}
               value={customCss}
               onChange={(e) => onCustomCssChange(e.target.value)}
+            />
+          </div>
+        ) : (
+          <div className="field">
+            <label>
+              <span>
+                <code>template/{activeTab}</code> — previews live with zero Docker rebuilds
+              </span>
+              {activeTab !== 'index.js' && (
+                <button
+                  type="button"
+                  className="btn btn-xs btn-danger"
+                  onClick={() => handleDeleteFile(activeTab)}
+                >
+                  Delete File
+                </button>
+              )}
+            </label>
+            <textarea
+              className="code-area"
+              style={{ minHeight: 400 }}
+              spellCheck={false}
+              value={templateFiles[activeTab] ?? ''}
+              onChange={(e) =>
+                onTemplateFilesChange({
+                  ...templateFiles,
+                  [activeTab]: e.target.value,
+                })
+              }
             />
           </div>
         )}

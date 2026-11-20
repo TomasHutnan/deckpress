@@ -123,7 +123,7 @@ app.put<{
     config?: ProjectConfig;
     design?: DesignConfig;
     controls?: ControlsSchema;
-    rendererJs?: string;
+    templateFiles?: Record<string, string>;
     overrides?: CardOverrides;
     customCss?: string;
     commitMessage?: string;

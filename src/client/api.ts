@@ -23,7 +23,7 @@ export interface LoadedProject {
   config: ProjectConfig;
   design: DesignConfig;
   controls: ControlsSchema;
-  rendererJs: string;
+  templateFiles: Record<string, string>;
   overrides: CardOverrides;
   customCss: string;
   git: GitStatusInfo;
@@ -85,7 +85,7 @@ export const api = {
       config?: ProjectConfig;
       design?: DesignConfig;
       controls?: ControlsSchema;
-      rendererJs?: string;
+      templateFiles?: Record<string, string>;
       overrides?: CardOverrides;
       customCss?: string;
       commitMessage?: string;

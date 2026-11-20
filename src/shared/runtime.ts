@@ -52,18 +52,12 @@ export const DECKPRESS_HELPERS = {
     renderCardsBaseCss(cardSize, customCss),
 };
 
-export const DEFAULT_RENDERER_JS = `// Project-owned card renderer (runs in browser preview & Chromium PDF export).
-// Edit freely — changes preview live with zero Docker rebuilds!
-//
-// Available on \`helpers\`:
-//   escapeHtml, hashString, mulberry32, randRange, pick,
-//   detectCardKind, resolveColor, computeCardLayout,
-//   getCardWatermarks, getSheetWatermarks, watermarksOverlap,
-//   BUILTIN_FOOD_ICONS, defaultRenderCard, defaultGetBaseCss
+export const DEFAULT_RENDERER_JS = `// Entry point for project template (template/index.js).
+// You can split logic across multiple .js/.css files in template/ and load them
+// via require('./other.js'). Changes preview live with zero Docker rebuilds!
 
 return {
   renderCard(ctx) {
-    // Customize HTML/SVG per card here, or wrap/replace helpers.defaultRenderCard(ctx).
     return helpers.defaultRenderCard(ctx);
   },
 
@@ -73,11 +67,17 @@ return {
 };
 `;
 
+function normalizeModuleName(name: string): string {
+  const clean = name.replace(/^\.\//, '').trim();
+  return clean.endsWith('.js') ? clean : `${clean}.js`;
+}
+
 /**
- * Compiles a project's `renderer.js` in the browser (never called on the Node server).
- * Falls back cleanly to the built-in renderer and reports any compile/runtime error.
+ * Compiles a project's `template/` folder (multiple .js and .css files) in the browser.
+ * Entry point is `index.js` (or legacy `renderer.js`). Sibling `.js` files can be loaded
+ * with `require('./filename.js')`, and all `.css` files are concatenated automatically.
  */
-export function compileProjectRenderer(code: string | undefined): {
+export function compileTemplateFiles(files: Record<string, string> | undefined): {
   renderer: ProjectRenderer;
   error: string | null;
 } {
@@ -86,28 +86,81 @@ export function compileProjectRenderer(code: string | undefined): {
     getBaseCss: DECKPRESS_HELPERS.defaultGetBaseCss,
   };
 
-  const trimmed = (code || '').trim();
-  if (!trimmed) return { renderer: fallback, error: null };
+  if (!files || Object.keys(files).length === 0) {
+    return { renderer: fallback, error: null };
+  }
+
+  const entryKey =
+    files['index.js'] !== undefined
+      ? 'index.js'
+      : files['renderer.js'] !== undefined
+        ? 'renderer.js'
+        : Object.keys(files).find((k) => k.endsWith('.js'));
+
+  const templateCss = Object.keys(files)
+    .filter((k) => k.endsWith('.css'))
+    .sort((a, b) => (a === 'styles.css' ? -1 : b === 'styles.css' ? 1 : a.localeCompare(b)))
+    .map((k) => files[k])
+    .join('\n\n');
+
+  if (!entryKey || !files[entryKey].trim()) {
+    return {
+      renderer: {
+        renderCard: fallback.renderCard,
+        getBaseCss: (cardSize, customCss) =>
+          `${fallback.getBaseCss(cardSize, '')}\n${templateCss}\n${customCss}`,
+      },
+      error: null,
+    };
+  }
+
+  const moduleCache = new Map<string, unknown>();
+  const loading = new Set<string>();
+
+  const requireModule = (specifier: string): unknown => {
+    const key = normalizeModuleName(specifier);
+    if (moduleCache.has(key)) return moduleCache.get(key);
+    if (loading.has(key)) {
+      throw new Error(`Circular template require detected: ${key}`);
+    }
+    const source = files[key];
+    if (source === undefined) {
+      throw new Error(`Template module not found: ${key}`);
+    }
+    loading.add(key);
+    try {
+      // eslint-disable-next-line no-new-func
+      const fn = new Function('helpers', 'require', source) as (
+        helpers: typeof DECKPRESS_HELPERS,
+        req: (s: string) => unknown,
+      ) => unknown;
+      const exported = fn(DECKPRESS_HELPERS, requireModule);
+      moduleCache.set(key, exported);
+      return exported;
+    } finally {
+      loading.delete(key);
+    }
+  };
 
   try {
-    // eslint-disable-next-line no-new-func
-    const factory = new Function('helpers', trimmed) as (
-      helpers: typeof DECKPRESS_HELPERS,
-    ) => Partial<ProjectRenderer> | undefined;
-    const mod = factory(DECKPRESS_HELPERS);
+    const mod = requireModule(entryKey) as Partial<ProjectRenderer> | undefined;
     if (!mod || typeof mod.renderCard !== 'function') {
       return {
         renderer: fallback,
-        error: 'renderer.js must return an object with a renderCard(ctx) function.',
+        error: `${entryKey} must return an object with a renderCard(ctx) function.`,
       };
     }
+
     return {
       renderer: {
         renderCard: (ctx) => String(mod.renderCard!(ctx)),
-        getBaseCss:
-          typeof mod.getBaseCss === 'function'
-            ? (cardSize, customCss) => String(mod.getBaseCss!(cardSize, customCss))
-            : fallback.getBaseCss,
+        getBaseCss: (cardSize, customCss) => {
+          const base =
+            typeof mod.getBaseCss === 'function'
+              ? String(mod.getBaseCss(cardSize, ''))
+              : '';
+          return `${base}\n${templateCss}\n${customCss}`;
+        },
       },
       error: null,
     };
@@ -117,4 +170,13 @@ export function compileProjectRenderer(code: string | undefined): {
       error: err instanceof Error ? err.message : String(err),
     };
   }
+}
+
+/** Backwards-compatible single-file wrapper */
+export function compileProjectRenderer(code: string | undefined): {
+  renderer: ProjectRenderer;
+  error: string | null;
+} {
+  if (!code?.trim()) return compileTemplateFiles(undefined);
+  return compileTemplateFiles({ 'index.js': code });
 }

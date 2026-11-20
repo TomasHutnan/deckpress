@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { compileProjectRenderer } from '../../shared/runtime';
+import { compileTemplateFiles } from '../../shared/runtime';
 import type {
   CardOverrides,
   CardSize,
@@ -12,7 +12,7 @@ interface CardGridProps {
   cards: ExpandedCard[];
   cardSize: CardSize;
   variant: DesignVariant;
-  rendererJs: string;
+  templateFiles: Record<string, string>;
   overrides: CardOverrides;
   customCss: string;
   customFontFacesCss: string;
@@ -26,7 +26,7 @@ export function CardGrid({
   cards,
   cardSize,
   variant,
-  rendererJs,
+  templateFiles,
   overrides,
   customCss,
   customFontFacesCss,
@@ -60,7 +60,10 @@ export function CardGrid({
     });
   }, [cards, filterType, search]);
 
-  const compiled = useMemo(() => compileProjectRenderer(rendererJs), [rendererJs]);
+  const compiled = useMemo(
+    () => compileTemplateFiles(templateFiles),
+    [templateFiles],
+  );
 
   const assetBaseUrl = `/api/projects/${encodeURIComponent(slug)}/assets`;
   // Show trim size cleanly in preview (bleed is applied automatically during PDF export)

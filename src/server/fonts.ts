@@ -9,6 +9,12 @@ interface BuiltinFontSpec {
 }
 
 const BUILTIN_FONTS: readonly BuiltinFontSpec[] = [
+  { pkg: 'barlow-condensed', family: 'Barlow Condensed', weight: 300, style: 'italic' },
+  { pkg: 'barlow-condensed', family: 'Barlow Condensed', weight: 400, style: 'italic' },
+  { pkg: 'barlow-condensed', family: 'Barlow Condensed', weight: 500, style: 'normal' },
+  { pkg: 'barlow-condensed', family: 'Barlow Condensed', weight: 700, style: 'normal' },
+  { pkg: 'barlow-condensed', family: 'Barlow Condensed', weight: 800, style: 'normal' },
+  { pkg: 'barlow-condensed', family: 'Barlow Condensed', weight: 900, style: 'normal' },
   { pkg: 'oswald', family: 'Oswald', weight: 500, style: 'normal' },
   { pkg: 'oswald', family: 'Oswald', weight: 700, style: 'normal' },
   { pkg: 'inter', family: 'Inter', weight: 300, style: 'italic' },
@@ -16,11 +22,17 @@ const BUILTIN_FONTS: readonly BuiltinFontSpec[] = [
   { pkg: 'inter', family: 'Inter', weight: 400, style: 'normal' },
   { pkg: 'inter', family: 'Inter', weight: 600, style: 'normal' },
   { pkg: 'inter', family: 'Inter', weight: 700, style: 'normal' },
+  { pkg: 'space-grotesk', family: 'Space Grotesk', weight: 500, style: 'normal' },
+  { pkg: 'space-grotesk', family: 'Space Grotesk', weight: 700, style: 'normal' },
+  { pkg: 'dancing-script', family: 'Dancing Script', weight: 500, style: 'normal' },
+  { pkg: 'dancing-script', family: 'Dancing Script', weight: 700, style: 'normal' },
+  { pkg: 'great-vibes', family: 'Great Vibes', weight: 400, style: 'normal' },
+  { pkg: 'kaushan-script', family: 'Kaushan Script', weight: 400, style: 'normal' },
+  { pkg: 'yusei-magic', family: 'Yusei Magic', weight: 400, style: 'normal' },
+  { pkg: 'playfair-display', family: 'Playfair Display', weight: 700, style: 'normal' },
   { pkg: 'caveat', family: 'Caveat', weight: 500, style: 'normal' },
   { pkg: 'caveat', family: 'Caveat', weight: 700, style: 'normal' },
   { pkg: 'pacifico', family: 'Pacifico', weight: 400, style: 'normal' },
-  { pkg: 'space-grotesk', family: 'Space Grotesk', weight: 500, style: 'normal' },
-  { pkg: 'space-grotesk', family: 'Space Grotesk', weight: 700, style: 'normal' },
 ];
 
 // Unicode ranges matching @fontsource latin-ext + latin subsets (includes full Slovak diacritics)
@@ -34,7 +46,7 @@ const SUBSET_RANGES: Record<'latin-ext' | 'latin', string> = {
 let cachedCss: string | null = null;
 
 /**
- * Inlines the 5 bundled @fontsource families as base64 data-URI @font-face rules so
+ * Inlines bundled SIL OFL @fontsource families as base64 data-URI @font-face rules so
  * headless Chromium renders 100% identical fonts to the browser preview offline.
  */
 export async function getBuiltinFontsCss(): Promise<string> {
@@ -58,7 +70,7 @@ export async function getBuiltinFontsCss(): Promise<string> {
           `@font-face { font-family: '${spec.family}'; font-style: ${spec.style}; font-weight: ${spec.weight}; font-display: block; src: url('data:font/woff2;base64,${b64}') format('woff2'); unicode-range: ${SUBSET_RANGES[subset]}; }`,
         );
       } catch {
-        // Skip missing subset file if any
+        // Skip missing subset file if a font only ships latin
       }
     }
   }

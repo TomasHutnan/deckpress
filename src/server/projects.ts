@@ -110,18 +110,66 @@ export interface LoadedProject {
   config: ProjectConfig;
   design: DesignConfig;
   controls: ControlsSchema;
-  rendererJs: string;
+  templateFiles: Record<string, string>;
   overrides: CardOverrides;
   customCss: string;
   git: GitStatusInfo;
   assets: AssetList;
 }
 
+function isValidTemplateFilename(name: string): boolean {
+  return /^[a-zA-Z0-9][a-zA-Z0-9._-]*\.(js|css)$/.test(name);
+}
+
+async function readTemplateFiles(dir: string): Promise<Record<string, string>> {
+  const tplDir = path.join(dir, 'template');
+  const files: Record<string, string> = {};
+  try {
+    const entries = await fs.readdir(tplDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isFile() || !isValidTemplateFilename(entry.name)) continue;
+      files[entry.name] = await fs.readFile(path.join(tplDir, entry.name), 'utf8');
+    }
+  } catch {
+    // No template/ folder yet; fall back to legacy renderer.js
+  }
+  if (Object.keys(files).length === 0) {
+    const legacy = await readTextOrDefault(path.join(dir, 'renderer.js'), DEFAULT_RENDERER_JS);
+    files['index.js'] = legacy;
+  }
+  return files;
+}
+
+async function writeTemplateFiles(
+  dir: string,
+  templateFiles: Record<string, string>,
+): Promise<void> {
+  const tplDir = path.join(dir, 'template');
+  await fs.mkdir(tplDir, { recursive: true });
+
+  const keep = new Set<string>();
+  for (const [name, content] of Object.entries(templateFiles)) {
+    if (!isValidTemplateFilename(name)) {
+      throw new Error(`Invalid template filename: ${name} (must end in .js or .css)`);
+    }
+    keep.add(name);
+    await fs.writeFile(path.join(tplDir, name), content, 'utf8');
+  }
+
+  // Remove deleted template files
+  const existing = await fs.readdir(tplDir).catch(() => []);
+  for (const file of existing) {
+    if (isValidTemplateFilename(file) && !keep.has(file)) {
+      await fs.unlink(path.join(tplDir, file)).catch(() => {});
+    }
+  }
+}
+
 export async function loadProject(slug: string): Promise<LoadedProject> {
   const dir = resolveProjectDir(slug);
   await fs.access(dir);
 
-  const [config, design, controls, rendererJs, overrides, customCss, git, assets] =
+  const [config, design, controls, templateFiles, overrides, customCss, git, assets] =
     await Promise.all([
       readJsonOrDefault<ProjectConfig>(
         path.join(dir, 'project.json'),
@@ -135,14 +183,14 @@ export async function loadProject(slug: string): Promise<LoadedProject> {
         path.join(dir, 'controls.json'),
         createDefaultControlsSchema(),
       ),
-      readTextOrDefault(path.join(dir, 'renderer.js'), DEFAULT_RENDERER_JS),
+      readTemplateFiles(dir),
       readJsonOrDefault<CardOverrides>(path.join(dir, 'overrides.json'), {}),
       readTextOrDefault(path.join(dir, 'custom.css'), ''),
       getGitStatus(dir),
       listAssets(slug),
     ]);
 
-  return { config, design, controls, rendererJs, overrides, customCss, git, assets };
+  return { config, design, controls, templateFiles, overrides, customCss, git, assets };
 }
 
 export async function createProject(params: {
@@ -189,7 +237,7 @@ async function ensureProjectScaffold(
   mode: 'blank' | 'template',
   googleSheetUrl?: string,
 ): Promise<void> {
-  for (const sub of ['assets/fonts', 'assets/icons', 'assets/images']) {
+  for (const sub of ['assets/fonts', 'assets/icons', 'assets/images', 'template']) {
     await fs.mkdir(path.join(dir, sub), { recursive: true });
   }
 
@@ -211,7 +259,7 @@ async function ensureProjectScaffold(
     path.join(dir, 'controls.json'),
     JSON.stringify(createDefaultControlsSchema(), null, 2) + '\n',
   );
-  await writeIfMissing(path.join(dir, 'renderer.js'), DEFAULT_RENDERER_JS);
+  await writeIfMissing(path.join(dir, 'template', 'index.js'), DEFAULT_RENDERER_JS);
   await writeIfMissing(path.join(dir, 'overrides.json'), '{}\n');
   await writeIfMissing(path.join(dir, 'custom.css'), '/* Project CSS overrides */\n');
   await writeIfMissing(path.join(dir, 'cards.csv'), STARTER_CSV);
@@ -246,7 +294,7 @@ export async function saveProjectDesign(
     config?: ProjectConfig;
     design?: DesignConfig;
     controls?: ControlsSchema;
-    rendererJs?: string;
+    templateFiles?: Record<string, string>;
     overrides?: CardOverrides;
     customCss?: string;
     commitMessage?: string;
@@ -279,8 +327,8 @@ export async function saveProjectDesign(
       'utf8',
     );
   }
-  if (payload.rendererJs !== undefined) {
-    await fs.writeFile(path.join(dir, 'renderer.js'), payload.rendererJs, 'utf8');
+  if (payload.templateFiles) {
+    await writeTemplateFiles(dir, payload.templateFiles);
   }
   if (payload.overrides) {
     await fs.writeFile(

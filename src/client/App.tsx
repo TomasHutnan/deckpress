@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type { ControlsSchema } from '../shared/controls';
-import { compileProjectRenderer } from '../shared/runtime';
+import { compileTemplateFiles } from '../shared/runtime';
 import type {
   CardOverrides,
   DesignConfig,
@@ -29,7 +29,7 @@ export function App() {
   const [draftConfig, setDraftConfig] = useState<ProjectConfig | null>(null);
   const [draftDesign, setDraftDesign] = useState<DesignConfig | null>(null);
   const [draftControls, setDraftControls] = useState<ControlsSchema>([]);
-  const [draftRendererJs, setDraftRendererJs] = useState<string>('');
+  const [draftTemplateFiles, setDraftTemplateFiles] = useState<Record<string, string>>({});
   const [draftOverrides, setDraftOverrides] = useState<CardOverrides>({});
   const [draftCustomCss, setDraftCustomCss] = useState<string>('');
 
@@ -47,7 +47,7 @@ export function App() {
     setDraftConfig(structuredClone(proj.config));
     setDraftDesign(structuredClone(proj.design));
     setDraftControls(structuredClone(proj.controls));
-    setDraftRendererJs(proj.rendererJs);
+    setDraftTemplateFiles(structuredClone(proj.templateFiles));
     setDraftOverrides(structuredClone(proj.overrides));
     setDraftCustomCss(proj.customCss);
   };
@@ -91,7 +91,7 @@ export function App() {
       JSON.stringify(draftConfig) !== JSON.stringify(savedProject.config) ||
       JSON.stringify(draftDesign) !== JSON.stringify(savedProject.design) ||
       JSON.stringify(draftControls) !== JSON.stringify(savedProject.controls) ||
-      draftRendererJs !== savedProject.rendererJs ||
+      JSON.stringify(draftTemplateFiles) !== JSON.stringify(savedProject.templateFiles) ||
       JSON.stringify(draftOverrides) !== JSON.stringify(savedProject.overrides) ||
       draftCustomCss !== savedProject.customCss
     );
@@ -100,7 +100,7 @@ export function App() {
     draftConfig,
     draftDesign,
     draftControls,
-    draftRendererJs,
+    draftTemplateFiles,
     draftOverrides,
     draftCustomCss,
   ]);
@@ -111,7 +111,7 @@ export function App() {
       config: draftConfig,
       design: draftDesign,
       controls: draftControls,
-      rendererJs: draftRendererJs,
+      templateFiles: draftTemplateFiles,
       overrides: draftOverrides,
       customCss: draftCustomCss,
       commitMessage,
@@ -168,9 +168,9 @@ export function App() {
 
   const handleExportPdf = async (options: ExportOptions) => {
     if (!activeSlug || !activeVariant) return;
-    const compiled = compileProjectRenderer(draftRendererJs);
+    const compiled = compileTemplateFiles(draftTemplateFiles);
     if (compiled.error) {
-      throw new Error(`Fix renderer.js error before exporting: ${compiled.error}`);
+      throw new Error(`Fix template error before exporting: ${compiled.error}`);
     }
     const filteredCards =
       options.filterType && options.filterType !== 'all'
@@ -312,7 +312,7 @@ export function App() {
             cards={cards}
             cardSize={draftConfig.cardSize}
             variant={activeVariant}
-            rendererJs={draftRendererJs}
+            templateFiles={draftTemplateFiles}
             overrides={draftOverrides}
             customCss={draftCustomCss}
             customFontFacesCss={customFontFacesCss}
@@ -401,10 +401,10 @@ export function App() {
 
       {modal === 'template' && savedProject && (
         <TemplateModal
-          rendererJs={draftRendererJs}
+          templateFiles={draftTemplateFiles}
           controls={draftControls}
           customCss={draftCustomCss}
-          onRendererJsChange={setDraftRendererJs}
+          onTemplateFilesChange={setDraftTemplateFiles}
           onControlsChange={setDraftControls}
           onCustomCssChange={setDraftCustomCss}
           onClose={() => setModal('none')}

@@ -5,7 +5,7 @@ import { expandCards, parseCsv } from './csv.js';
 import { createMenuTemplateDesign } from './defaults.js';
 import { computeCardLayout, detectCardKind } from './layout.js';
 import { renderCardHtml, renderPrintDocumentHtml } from './renderCard.js';
-import { compileProjectRenderer } from './runtime.js';
+import { compileProjectRenderer, compileTemplateFiles } from './runtime.js';
 import { getSheetWatermarks, watermarksOverlap } from './watermark.js';
 
 describe('DeckPress shared card engine', () => {
@@ -221,5 +221,27 @@ describe('DeckPress shared card engine', () => {
 
     const broken = compileProjectRenderer('return {{{ broken');
     assert.ok(broken.error);
+
+    const multi = compileTemplateFiles({
+      'index.js': "const m = require('./sub.js'); return { renderCard: (ctx) => m.wrap(ctx.card.title) };",
+      'sub.js': "return { wrap: (t) => '<p>' + t + '</p>' };",
+      'styles.css': '.custom { color: red; }',
+    });
+    assert.equal(multi.error, null);
+    assert.equal(
+      multi.renderer.renderCard({
+        card,
+        variant,
+        overrides: {},
+        assetBaseUrl: '/assets',
+        cardIndex: 0,
+        cardSize: { widthMm: 63, heightMm: 88, bleedMm: 0 },
+      }),
+      '<p>OLIVY</p>',
+    );
+    assert.match(
+      multi.renderer.getBaseCss({ widthMm: 63, heightMm: 88, bleedMm: 0 }, ''),
+      /\.custom \{ color: red; \}/,
+    );
   });
 });
