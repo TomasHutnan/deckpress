@@ -26,17 +26,10 @@ interface DesignPanelProps {
 }
 
 const FONT_OPTIONS = [
-  { label: 'Barlow Condensed (Heavy)', value: "'Barlow Condensed', 'Oswald', sans-serif" },
-  { label: 'Oswald (Condensed)', value: "'Oswald', 'Arial Narrow', sans-serif" },
-  { label: 'Inter (Clean Sans)', value: "'Inter', 'Helvetica Neue', Arial, sans-serif" },
+  { label: 'Barlow Condensed', value: "'Barlow Condensed', 'Oswald', sans-serif" },
+  { label: 'Oswald', value: "'Oswald', 'Arial Narrow', sans-serif" },
+  { label: 'Inter', value: "'Inter', 'Helvetica Neue', Arial, sans-serif" },
   { label: 'Space Grotesk', value: "'Space Grotesk', sans-serif" },
-  { label: 'Dancing Script (TAL)', value: "'Dancing Script', cursive" },
-  { label: 'Great Vibes (FRA)', value: "'Great Vibes', cursive" },
-  { label: 'Yusei Magic (MEX)', value: "'Yusei Magic', sans-serif" },
-  { label: 'Kaushan Script (JAP)', value: "'Kaushan Script', cursive" },
-  { label: 'Playfair Display (IND)', value: "'Playfair Display', serif" },
-  { label: 'Caveat (Handwritten)', value: "'Caveat', cursive" },
-  { label: 'Pacifico (Brush)', value: "'Pacifico', cursive" },
 ];
 
 function Section({

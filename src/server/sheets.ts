@@ -1,12 +1,13 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { expandCards, parseCsv } from '../shared/csv.js';
+import { expandCards, parseCsvWithColumns } from '../shared/csv.js';
 import type { CardRow, ExpandedCard, ProjectConfig } from '../shared/types.js';
 import { resolveProjectDir } from './projects.js';
 
 export interface CardsResult {
   source: 'google-sheet' | 'local-csv';
   warning?: string;
+  columns: string[];
   rows: CardRow[];
   cards: ExpandedCard[];
 }
@@ -31,12 +32,13 @@ export async function fetchProjectCards(
         throw new Error(`HTTP ${res.status}`);
       }
       const csvText = await res.text();
-      const rows = parseCsv(csvText);
+      const { columns, rows } = parseCsvWithColumns(csvText);
       if (rows.length > 0) {
         // Cache latest fetched sheet locally so offline/print works seamlessly
         await fs.writeFile(localPath, csvText, 'utf8').catch(() => {});
         return {
           source: 'google-sheet',
+          columns,
           rows,
           cards: expandCards(rows),
         };
@@ -45,10 +47,11 @@ export async function fetchProjectCards(
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       const localText = await fs.readFile(localPath, 'utf8').catch(() => '');
-      const rows = parseCsv(localText);
+      const { columns, rows } = parseCsvWithColumns(localText);
       return {
         source: 'local-csv',
         warning: `Google Sheet unreachable (${msg}); showing local ${config.localCsv}.`,
+        columns,
         rows,
         cards: expandCards(rows),
       };
@@ -56,9 +59,10 @@ export async function fetchProjectCards(
   }
 
   const localText = await fs.readFile(localPath, 'utf8').catch(() => '');
-  const rows = parseCsv(localText);
+  const { columns, rows } = parseCsvWithColumns(localText);
   return {
     source: 'local-csv',
+    columns,
     rows,
     cards: expandCards(rows),
   };

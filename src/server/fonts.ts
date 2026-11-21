@@ -24,15 +24,6 @@ const BUILTIN_FONTS: readonly BuiltinFontSpec[] = [
   { pkg: 'inter', family: 'Inter', weight: 700, style: 'normal' },
   { pkg: 'space-grotesk', family: 'Space Grotesk', weight: 500, style: 'normal' },
   { pkg: 'space-grotesk', family: 'Space Grotesk', weight: 700, style: 'normal' },
-  { pkg: 'dancing-script', family: 'Dancing Script', weight: 500, style: 'normal' },
-  { pkg: 'dancing-script', family: 'Dancing Script', weight: 700, style: 'normal' },
-  { pkg: 'great-vibes', family: 'Great Vibes', weight: 400, style: 'normal' },
-  { pkg: 'kaushan-script', family: 'Kaushan Script', weight: 400, style: 'normal' },
-  { pkg: 'yusei-magic', family: 'Yusei Magic', weight: 400, style: 'normal' },
-  { pkg: 'playfair-display', family: 'Playfair Display', weight: 700, style: 'normal' },
-  { pkg: 'caveat', family: 'Caveat', weight: 500, style: 'normal' },
-  { pkg: 'caveat', family: 'Caveat', weight: 700, style: 'normal' },
-  { pkg: 'pacifico', family: 'Pacifico', weight: 400, style: 'normal' },
 ];
 
 // Unicode ranges matching @fontsource latin-ext + latin subsets (includes full Slovak diacritics)

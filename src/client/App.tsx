@@ -44,6 +44,7 @@ export function App() {
   const [exportingDoc, setExportingDoc] = useState(false);
   const [docExportError, setDocExportError] = useState('');
 
+  const [cardColumns, setCardColumns] = useState<string[]>([]);
   const [savedCardRows, setSavedCardRows] = useState<CardRow[]>([]);
   const [draftCardRows, setDraftCardRows] = useState<CardRow[]>([]);
   const cards = useMemo(() => expandCards(draftCardRows), [draftCardRows]);
@@ -70,6 +71,7 @@ export function App() {
     setSyncing(true);
     try {
       const res = await api.fetchCards(slug);
+      setCardColumns(res.columns || []);
       setSavedCardRows(structuredClone(res.rows));
       setDraftCardRows(structuredClone(res.rows));
       setCardsWarning(res.warning || '');
@@ -137,7 +139,7 @@ export function App() {
       controls: draftControls,
       templateFiles: draftTemplateFiles,
       docs: draftDocs,
-      ...(cardsDirty ? { cardsCsv: serializeCsv(draftCardRows) } : {}),
+      ...(cardsDirty ? { cardsCsv: serializeCsv(draftCardRows, cardColumns) } : {}),
       overrides: draftOverrides,
       customCss: draftCustomCss,
       commitMessage,
@@ -168,6 +170,7 @@ export function App() {
   const handleUploadCsv = async (file: File) => {
     if (!activeSlug) return;
     const res = await api.uploadCsv(activeSlug, file);
+    setCardColumns(res.columns || []);
     setSavedCardRows(structuredClone(res.rows));
     setDraftCardRows(structuredClone(res.rows));
     setCardsWarning('');
@@ -194,7 +197,7 @@ export function App() {
   }, [savedProject, activeSlug]);
 
   const typeGroups = useMemo(() => {
-    return Array.from(new Set(cards.map((c) => c.type_group).filter(Boolean)));
+    return Array.from(new Set(cards.map((c) => String(c.type_group || '')).filter(Boolean)));
   }, [cards]);
 
   const handleExportPdf = async (options: ExportOptions) => {
@@ -204,7 +207,7 @@ export function App() {
       throw new Error(`Fix template error before exporting: ${compiled.error}`);
     }
     const filteredCards = Array.isArray(options.filterTypes)
-      ? cards.filter((c) => options.filterTypes!.includes(c.type_group))
+      ? cards.filter((c) => options.filterTypes!.includes(String(c.type_group || '')))
       : options.filterType && options.filterType !== 'all'
         ? cards.filter((c) => c.type_group === options.filterType)
         : cards;
@@ -435,7 +438,9 @@ export function App() {
         ) : activeView === 'data' ? (
           <DataEditor
             slug={activeSlug}
+            columns={cardColumns}
             rows={draftCardRows}
+            onColumnsChange={setCardColumns}
             onRowsChange={setDraftCardRows}
             onUploadCsv={handleUploadCsv}
           />

@@ -1,24 +1,25 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { createDefaultControlsSchema, getByPath, setByPath } from './controls.js';
-import { expandCards, parseCsv } from './csv.js';
-import { createMenuTemplateDesign } from './defaults.js';
-import { computeCardLayout, detectCardKind } from './layout.js';
-import { renderCardHtml, renderPrintDocumentHtml } from './renderCard.js';
+import { expandCards, parseCsvWithColumns, serializeCsv } from './csv.js';
+import { createStarterDesign } from './defaults.js';
+import { resolveColor } from './layout.js';
+import { renderDefaultCardHtml, renderPrintDocumentHtml } from './print.js';
 import { compileProjectRenderer, compileTemplateFiles } from './runtime.js';
 import { getSheetWatermarks, watermarksOverlap } from './watermark.js';
 
-describe('DeckPress shared card engine', () => {
-  it('parses Slovak UTF-8 CSV with quoted fields and expands counts', () => {
+describe('DeckPress game-agnostic core engine', () => {
+  it('parses arbitrary UTF-8 CSV columns, expands counts, and round-trips via serializeCsv', () => {
     const csv = [
-      'id,type_group,kitchen,color,size,title,subtitle,tags_str,count,image,is_action,description',
-      'CARD_001,Surovina,UNI,sivá,celá,"SÓJOVÉ ""MÄSO""",SÓJOVÉ MÄSO,UNI V,2,,0,',
-      'CARD_002,Surovina,IND~JAP,hnedá/červená,celá,ZÁZVOR,ZÁZVOR,IND~JAP V,1,,0,',
+      'id,type_group,faction,title,count,effect',
+      'CARD_001,Unit,Blue,"HERO, ""ELITE""",2,Draw 1 card',
+      'CARD_002,Spell,Red,FIREBALL,1,Deal 3 damage',
     ].join('\n');
 
-    const rows = parseCsv(csv);
+    const { columns, rows } = parseCsvWithColumns(csv);
+    assert.deepEqual(columns, ['id', 'type_group', 'faction', 'title', 'count', 'effect']);
     assert.equal(rows.length, 2);
-    assert.equal(rows[0].title, 'SÓJOVÉ "MÄSO"');
+    assert.equal(rows[0].title, 'HERO, "ELITE"');
     assert.equal(rows[0].count, 2);
 
     const expanded = expandCards(rows);
@@ -26,114 +27,43 @@ describe('DeckPress shared card engine', () => {
     assert.equal(expanded[0]._instanceKey, 'CARD_001__1');
     assert.equal(expanded[1]._instanceKey, 'CARD_001__2');
     assert.equal(expanded[2]._instanceKey, 'CARD_002');
+
+    const roundTrip = parseCsvWithColumns(serializeCsv(rows, columns));
+    assert.deepEqual(roundTrip.columns, columns);
+    assert.equal(roundTrip.rows[0].title, 'HERO, "ELITE"');
   });
 
-  it('detects all five card kinds accurately', () => {
-    const rows = parseCsv(
-      [
-        'id,type_group,kitchen,color,size,title,subtitle,tags_str,count,image,is_action,description',
-        'C1,Surovina,TAL,zelená,celá,OLIVY,ČIERNE OLIVY,TAL V,1,,0,',
-        'C2,Surovina,TAL,zelená,polovičná,BRUSCHETTA,BRUSCHETTA,TAL V 1/2,1,,0,',
-        'C3,Surovina,IND~JAP,hnedá/červená,celá,ZÁZVOR,ZÁZVOR,IND~JAP V,1,,0,',
-        'C4,Akcia,,čierna,,INVENTÚRA,,,1,,1,Skontroluj karty',
-        'C5,Špeciálna,,modrá,,KORENIE (FRA),,,1,,2,Zmení chod',
-      ].join('\n'),
-    );
-    const expanded = expandCards(rows);
-    assert.deepEqual(expanded.map(detectCardKind), [
-      'ingredient-whole',
-      'ingredient-half',
-      'ingredient-dual',
-      'action',
-      'special',
-    ]);
+  it('resolves palette colors generically with case-insensitive fallback', () => {
+    const palette = { primary: '#2563EB', ACCENT: '#DC2626', default: '#1C1C1C' };
+    assert.equal(resolveColor('primary', palette), '#2563EB');
+    assert.equal(resolveColor('accent', palette), '#DC2626');
+    assert.equal(resolveColor('missing', palette), '#1C1C1C');
   });
 
-  it('produces deterministic layouts that change when seed override changes', () => {
-    const variant = createMenuTemplateDesign().variants['classic-minimal'];
-    const [card] = expandCards(
-      parseCsv(
-        'id,type_group,kitchen,color,size,title,subtitle,tags_str,count,image,is_action,description\n' +
-          'C1,Surovina,TAL,zelená,celá,OLIVY,ČIERNE OLIVY,TAL V,1,,0,',
-      ),
-    );
-
-    const a = computeCardLayout(card, variant);
-    const b = computeCardLayout(card, variant);
-    const c = computeCardLayout(card, variant, { seed: 99999 });
-
-    assert.deepEqual(a, b);
-    assert.notEqual(a.effectiveSeed, c.effectiveSeed);
-  });
-
-  it('renders both individual and packed sheet print documents with cut guidelines', () => {
-    const variant = createMenuTemplateDesign().variants['classic-minimal'];
+  it('generates non-overlapping connected sheet watermarks and print documents', () => {
+    const variant = createStarterDesign().variants.default;
     const cards = expandCards(
-      parseCsv(
-        'id,type_group,kitchen,color,size,title,subtitle,tags_str,count,image,is_action,description\n' +
-          'C1,Surovina,TAL,zelená,celá,OLIVY,ČIERNE OLIVY,TAL V,1,,0,\n' +
-          'C2,Surovina,IND~JAP,hnedá/červená,celá,ZÁZVOR,ZÁZVOR,IND~JAP V,1,,0,',
-      ),
+      parseCsvWithColumns(
+        'id,type_group,color,title,count,description\n' +
+          'C1,Unit,primary,SCOUT,1,Fast\n' +
+          'C2,Action,accent,SURGE,1,Draw 2',
+      ).rows,
     );
 
-    const single = renderCardHtml(cards[1], variant, {}, '/api/projects/the-menu/assets');
-    assert.match(single.html, /dp-dual-bottom/);
-    assert.equal(single.layout.primaryColor, variant.palette.IND);
-    assert.equal(single.layout.secondaryColor, variant.palette.JAP);
-
-    const noMarkVariant = structuredClone(variant);
-    noMarkVariant.gameMark.probability = 0;
-    const dualNoMark = computeCardLayout(cards[1], noMarkVariant);
-    assert.equal(dualNoMark.showMark, false);
-
-    const [veganSpecial] = expandCards(
-      parseCsv(
-        'id,type_group,kitchen,size,title,subtitle,tags_str,count,image,is_action,description\n' +
-          'C96,Špeciálna,,,VEGÁN,ŠPECIÁLNA KARTA,V BONUS,1,,2,Vyber protihráča (ostáva na stole)',
-      ),
-    );
-    const specialRes = renderCardHtml(
-      veganSpecial,
-      variant,
-      {},
-      '/api/projects/the-menu/assets',
-    );
-    assert.equal(specialRes.layout.primaryColor, variant.palette.default);
-    assert.match(specialRes.html, />V BONUS</);
-    assert.match(specialRes.html, /class="dp-subtitle">ŠPECIÁLNA KARTA</);
-    assert.doesNotMatch(specialRes.html, /dp-subtitle-muted/);
-
-    const [recipeCard] = expandCards(
-      parseCsv(
-        'id,type_group,kitchen,size,title,subtitle,tags_str,count,image,is_action,description,recipe_change\n' +
-          'C88,Špeciálna,TAL,,DETSKÁ PORCIA,ŠPECIÁLNA KARTA,TAL,1,,2,Na TAL chody ti stačia iba tri suroviny,2+2 -> 2+1',
-      ),
-    );
-    const recipeHtml = renderCardHtml(
-      recipeCard,
-      variant,
-      {},
-      '/api/projects/the-menu/assets',
-    ).html;
-    assert.match(recipeHtml, /dp-recipe-change/);
-    assert.match(
-      recipeHtml,
-      new RegExp(`style="color:${variant.palette.TAL}">2</span>.*style="color:${variant.palette.UNI}">2</span>.*→.*style="color:${variant.palette.TAL}">2</span>.*style="color:${variant.palette.UNI}">1</span>`),
-    );
-    assert.match(
-      recipeHtml,
-      new RegExp(`<strong style="color:${variant.palette.TAL}">TAL</strong>`),
-    );
+    const starterHtml = renderDefaultCardHtml(cards[0], variant);
+    assert.match(starterHtml, /SCOUT/);
+    assert.match(starterHtml, /#2563EB/);
 
     const wmVariant = structuredClone(variant);
     wmVariant.canvas.mode = 'watermark';
-    wmVariant.canvas.watermarkText = 'MENU';
+    wmVariant.canvas.watermarkText = 'GAME';
     wmVariant.canvas.watermarkSizeMinMm = 18;
     wmVariant.canvas.watermarkSizeMaxMm = 42;
     wmVariant.canvas.watermarkAngleMinDeg = -35;
     wmVariant.canvas.watermarkAngleMaxDeg = 35;
     wmVariant.canvas.watermarkAllowOverlap = false;
     wmVariant.canvas.watermarkCols = 3;
+
     const sheetSize = { widthMm: 63, heightMm: 88, bleedMm: 0 };
     const wmWords = getSheetWatermarks(wmVariant, sheetSize, 6);
     assert.ok(wmWords.length > 0);
@@ -144,16 +74,12 @@ describe('DeckPress shared card engine', () => {
         assert.equal(watermarksOverlap(wmWords[i], wmWords[j]), false);
       }
     }
-    const wm0 = renderCardHtml(cards[0], wmVariant, {}, '/assets', undefined, 0, sheetSize).html;
-    const wm1 = renderCardHtml(cards[1], wmVariant, {}, '/assets', undefined, 1, sheetSize).html;
-    assert.match(wm0, /class="dp-watermark-layer"[^>]*viewBox="0 0 63 88"/);
-    assert.match(wm1, /class="dp-watermark-layer"[^>]*viewBox="63 0 63 88"/);
 
     const individualDoc = renderPrintDocumentHtml({
       cards,
       variant,
       overrides: {},
-      assetBaseUrl: '/api/projects/the-menu/assets',
+      assetBaseUrl: '/api/projects/demo/assets',
       options: {
         cardWidthMm: 63,
         cardHeightMm: 88,
@@ -170,7 +96,7 @@ describe('DeckPress shared card engine', () => {
       cards,
       variant,
       overrides: {},
-      assetBaseUrl: '/api/projects/the-menu/assets',
+      assetBaseUrl: '/api/projects/demo/assets',
       options: {
         cardWidthMm: 63,
         cardHeightMm: 88,
@@ -185,7 +111,7 @@ describe('DeckPress shared card engine', () => {
     assert.match(sheetDoc, /dp-cut-grid/);
   });
 
-  it('compiles project renderer.js and updates nested values via controls paths', () => {
+  it('compiles multi-file project templates and updates nested values via controls paths', () => {
     const schema = createDefaultControlsSchema();
     assert.ok(schema.length >= 4);
 
@@ -202,13 +128,8 @@ describe('DeckPress shared card engine', () => {
       };
     `);
     assert.equal(custom.error, null);
-    const variant = createMenuTemplateDesign().variants['classic-minimal'];
-    const [card] = expandCards(
-      parseCsv(
-        'id,type_group,kitchen,size,title,subtitle,tags_str,count,image,is_action,description\n' +
-          'C1,Surovina,TAL,celá,OLIVY,ČIERNE OLIVY,TAL V,1,,0,',
-      ),
-    );
+    const variant = createStarterDesign().variants.default;
+    const [card] = expandCards(parseCsvWithColumns('id,title,count\nC1,SCOUT,1').rows);
     const html = custom.renderer.renderCard({
       card,
       variant,
@@ -217,7 +138,7 @@ describe('DeckPress shared card engine', () => {
       cardIndex: 0,
       cardSize: { widthMm: 63, heightMm: 88, bleedMm: 0 },
     });
-    assert.equal(html, '<div class="custom-card">OLIVY</div>');
+    assert.equal(html, '<div class="custom-card">SCOUT</div>');
 
     const broken = compileProjectRenderer('return {{{ broken');
     assert.ok(broken.error);
@@ -237,7 +158,7 @@ describe('DeckPress shared card engine', () => {
         cardIndex: 0,
         cardSize: { widthMm: 63, heightMm: 88, bleedMm: 0 },
       }),
-      '<p>OLIVY</p>',
+      '<p>SCOUT</p>',
     );
     assert.match(
       multi.renderer.getBaseCss({ widthMm: 63, heightMm: 88, bleedMm: 0 }, ''),

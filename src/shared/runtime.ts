@@ -1,7 +1,6 @@
-import { BUILTIN_FOOD_ICONS } from './defaults.js';
-import { computeCardLayout, detectCardKind, resolveColor } from './layout.js';
+import { resolveColor } from './layout.js';
+import { escapeHtml, renderDefaultCardHtml, renderDefaultCardsBaseCss } from './print.js';
 import { hashString, mulberry32, pick, randRange } from './prng.js';
-import { escapeHtml, renderCardHtml, renderCardsBaseCss } from './renderCard.js';
 import type {
   CardOverrides,
   CardSize,
@@ -34,29 +33,18 @@ export const DECKPRESS_HELPERS = {
   mulberry32,
   randRange,
   pick,
-  detectCardKind,
   resolveColor,
-  computeCardLayout,
   getCardWatermarks,
   getSheetWatermarks,
   watermarksOverlap,
-  BUILTIN_FOOD_ICONS,
   defaultRenderCard: (ctx: RenderCardContext) =>
-    renderCardHtml(
-      ctx.card,
-      ctx.variant,
-      ctx.overrides,
-      ctx.assetBaseUrl,
-      ctx.customIconsSvg,
-      ctx.cardIndex,
-      ctx.cardSize,
-    ).html,
+    renderDefaultCardHtml(ctx.card, ctx.variant, ctx.cardSize),
   defaultGetBaseCss: (cardSize: CardSize, customCss = '') =>
-    renderCardsBaseCss(cardSize, customCss),
+    renderDefaultCardsBaseCss(cardSize, customCss),
 };
 
 export const DEFAULT_RENDERER_JS = `// Entry point for project template (template/index.js).
-// You can split logic across multiple .js/.css files in template/ and load them
+// Split logic across multiple .js/.css files in template/ and load them
 // via require('./other.js'). Changes preview live with zero Docker rebuilds!
 
 return {
@@ -77,11 +65,11 @@ function normalizeModuleName(name: string): string {
 
 function defaultRenderCardBack(ctx: RenderCardContext): string {
   const { card, variant, cardSize } = ctx;
-  const label = escapeHtml((variant.gameMark?.text || 'MENU').toUpperCase());
+  const label = escapeHtml((variant.gameMark?.text || 'CARD').toUpperCase());
   return `
-    <div class="dp-card" data-card-id="${escapeHtml(card._instanceKey)}" style="--tm-w:${cardSize.widthMm}mm;--tm-h:${cardSize.heightMm}mm;--tm-bleed:${cardSize.bleedMm}mm;--dp-bg:${variant.backgroundColor};--dp-fg:${variant.textColor};">
+    <div class="dp-card" data-card-id="${escapeHtml(card._instanceKey)}" style="--dp-w:${cardSize.widthMm}mm;--dp-h:${cardSize.heightMm}mm;--dp-bleed:${cardSize.bleedMm}mm;--dp-bg:${variant.backgroundColor};--dp-fg:${variant.textColor};">
       <div class="dp-trim-area" style="display:flex;align-items:center;justify-content:center;background:${variant.backgroundColor};color:${variant.textColor};">
-        <div style="font-family:${variant.typography.titleFont};font-size:22pt;font-weight:900;letter-spacing:0.08em;opacity:0.18">${label}</div>
+        <div style="font-family:${variant.typography.titleFont};font-size:20pt;font-weight:900;letter-spacing:0.08em;opacity:0.18">${label}</div>
       </div>
     </div>
   `;

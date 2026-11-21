@@ -351,8 +351,8 @@ export function DocsStudio({
         )}
 
         <div className="docs-hint">
-          Directives: <code>{'{{card:CARD_029}}'}</code> · <code>{'{{card-row: ...}}'}</code> ·{' '}
-          <code>{'{{pill:TAL}}'}</code> · <code>{'{{count:playable}}'}</code> ·{' '}
+          Directives: <code>{'{{card:ID}}'}</code> · <code>{'{{card-row: ...}}'}</code> ·{' '}
+          <code>{'{{pill:KEY}}'}</code> · <code>{'{{count:field=val}}'}</code> ·{' '}
           <code>{'{{diagram:name}}'}</code> · <code>---col---</code> · <code>---page---</code>
         </div>
       </aside>

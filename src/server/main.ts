@@ -348,7 +348,7 @@ app.post<{
       Object.values(loaded.design.variants)[0];
 
     const filteredCards = Array.isArray(opts.filterTypes)
-      ? cardsRes.cards.filter((c) => opts.filterTypes!.includes(c.type_group))
+      ? cardsRes.cards.filter((c) => opts.filterTypes!.includes(String(c.type_group || '')))
       : opts.filterType && opts.filterType !== 'all'
         ? cardsRes.cards.filter((c) => c.type_group === opts.filterType)
         : cardsRes.cards;

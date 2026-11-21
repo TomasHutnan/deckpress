@@ -60,11 +60,8 @@ export function CardGrid({
     return cards.filter((c) => {
       if (filterType !== 'all' && c.type_group !== filterType) return false;
       if (!q) return true;
-      return (
-        c.title.toLowerCase().includes(q) ||
-        c.subtitle.toLowerCase().includes(q) ||
-        c.tags_str.toLowerCase().includes(q) ||
-        c.description.toLowerCase().includes(q)
+      return Object.values(c).some((v) =>
+        v !== undefined && v !== null && String(v).toLowerCase().includes(q),
       );
     });
   }, [cards, filterType, search]);

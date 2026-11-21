@@ -15,15 +15,6 @@ import '@fontsource/inter/600.css';
 import '@fontsource/inter/700.css';
 import '@fontsource/space-grotesk/500.css';
 import '@fontsource/space-grotesk/700.css';
-import '@fontsource/dancing-script/500.css';
-import '@fontsource/dancing-script/700.css';
-import '@fontsource/great-vibes/400.css';
-import '@fontsource/kaushan-script/400.css';
-import '@fontsource/yusei-magic/400.css';
-import '@fontsource/playfair-display/700.css';
-import '@fontsource/caveat/500.css';
-import '@fontsource/caveat/700.css';
-import '@fontsource/pacifico/400.css';
 import { App } from './App';
 import './styles.css';
 

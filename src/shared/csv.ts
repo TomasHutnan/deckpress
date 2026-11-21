@@ -10,9 +10,13 @@ function normalizeHeader(header: string): string {
 }
 
 /**
- * RFC-4180 compliant CSV parser preserving UTF-8 diacritics and quoted newlines/commas.
+ * RFC-4180 compliant CSV parser preserving UTF-8 diacritics, quoted newlines/commas,
+ * and exact column order for arbitrary game schemas.
  */
-export function parseCsv(input: string): CardRow[] {
+export function parseCsvWithColumns(input: string): {
+  columns: string[];
+  rows: CardRow[];
+} {
   const grid: string[][] = [];
   let row: string[] = [];
   let cell = '';
@@ -60,11 +64,12 @@ export function parseCsv(input: string): CardRow[] {
     grid.push(row);
   }
 
-  if (grid.length === 0) return [];
+  if (grid.length === 0) return { columns: [], rows: [] };
   const rawHeaders = grid.shift()!;
   const headers = rawHeaders.map(normalizeHeader);
+  const columns = headers.filter(Boolean);
 
-  const results: CardRow[] = [];
+  const rows: CardRow[] = [];
   for (let r = 0; r < grid.length; r++) {
     const line = grid[r];
     if (!line || line.every((v) => v.trim() === '')) continue;
@@ -82,32 +87,24 @@ export function parseCsv(input: string): CardRow[] {
     );
     const count = Number.isFinite(parsedCount) && parsedCount > 0 ? parsedCount : 1;
 
-    results.push({
+    rows.push({
       ...record,
       id: String(record.id || `ROW_${String(r + 1).padStart(3, '0')}`),
-      type_group: String(record.type_group || 'Surovina'),
-      kitchen: String(record.kitchen || ''),
-      color: String(record.color || ''),
-      size: String(record.size || ''),
-      title: String(record.title || ''),
-      subtitle: String(record.subtitle || ''),
-      tags_str: String(record.tags_str || ''),
       count,
-      image: String(record.image || ''),
-      is_action: String(record.is_action || '0'),
-      description: String(record.description || ''),
-      recipe_change: record.recipe_change ? String(record.recipe_change) : undefined,
-      seed: record.seed ? String(record.seed) : undefined,
     });
   }
 
-  return results;
+  return { columns, rows };
+}
+
+export function parseCsv(input: string): CardRow[] {
+  return parseCsvWithColumns(input).rows;
 }
 
 export function expandCards(rows: CardRow[]): ExpandedCard[] {
   const expanded: ExpandedCard[] = [];
   for (const row of rows) {
-    const copies = Math.max(1, row.count || 1);
+    const copies = Math.max(1, Number(row.count) || 1);
     for (let i = 0; i < copies; i++) {
       expanded.push({
         ...row,
@@ -120,22 +117,6 @@ export function expandCards(rows: CardRow[]): ExpandedCard[] {
   return expanded;
 }
 
-const DEFAULT_CSV_COLUMNS = [
-  'id',
-  'type_group',
-  'kitchen',
-  'size',
-  'title',
-  'subtitle',
-  'tags_str',
-  'count',
-  'image',
-  'is_action',
-  'joins_dish',
-  'description',
-  'recipe_change',
-];
-
 function escapeCsvCell(value: string | number | undefined): string {
   const str = value === undefined || value === null ? '' : String(value);
   if (/[",\r\n]/.test(str)) {
@@ -145,14 +126,14 @@ function escapeCsvCell(value: string | number | undefined): string {
 }
 
 /**
- * Serializes CardRow[] back to RFC-4180 UTF-8 CSV, preserving standard columns plus any custom columns.
+ * Serializes CardRow[] back to RFC-4180 UTF-8 CSV, preserving column order.
  */
 export function serializeCsv(rows: CardRow[], preferredColumns?: string[]): string {
-  const colSet = new Set<string>(preferredColumns && preferredColumns.length > 0 ? preferredColumns : DEFAULT_CSV_COLUMNS);
+  const colSet = new Set<string>(preferredColumns || []);
   for (const row of rows) {
     for (const key of Object.keys(row)) {
-      if (key.startsWith('_') || key === 'color' && !row.color) continue;
-      if (row[key] !== undefined && row[key] !== '') {
+      if (key.startsWith('_')) continue;
+      if (row[key] !== undefined) {
         colSet.add(key);
       }
     }

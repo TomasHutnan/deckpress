@@ -35,6 +35,7 @@ export interface LoadedProject {
 export interface CardsResponse {
   source: 'google-sheet' | 'local-csv';
   warning?: string;
+  columns?: string[];
   rows: CardRow[];
   cards: ExpandedCard[];
 }

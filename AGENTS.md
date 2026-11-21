@@ -12,6 +12,7 @@ Single source of truth for **DeckPress** (`deckpress`) — architecture, rules, 
   - [ADR-0003](docs/adr/0003-project-storage-and-local-git.md): Gitignored `projects/` directory with a local Git repo per project, live UI drafts, named variants, and optional Git remote sync
   - [ADR-0004](docs/adr/0004-project-owned-renderer-and-controls.md): Per-project `renderer.js` and `controls.json` so layout, rules, and UI controls evolve without Docker rebuilds
   - [ADR-0005](docs/adr/0005-markdown-rules-and-overview-cards.md): Project-owned section-split Markdown rules (`docs/`), live card embeds, auto-generated card lists, and native DeckPress overview cards
+  - [ADR-0006](docs/adr/0006-game-agnostic-engine.md): Game-agnostic core engine (dynamic CSV columns, generic doc `{{count:...}}` filters, extracted print imposition, slim core fonts)
 
 ## Commands
 - `npm test` — Run unit tests (`node --test src/shared/*.test.ts`)
@@ -40,3 +41,4 @@ Single source of truth for **DeckPress** (`deckpress`) — architecture, rules, 
 - [x] Drafted and compiled Slovak rulebook (`projects/the-menu/rules/rules.tex`), 4-up 63×88 mm player overviews (`projects/the-menu/rules/overview.tex`), and auto-generated card list (`projects/the-menu/rules/card_list.tex`).
 
 - [x] `[ADR-0005]` Extended DeckPress with project-owned `docs/` (section-split Markdown + `{{card:...}}`/`{{pill:...}}`/`{{count:...}}`/`{{diagram:...}}` directives + programmatic `render.js`, `Rules & Docs` studio tab, Chromium PDF export) and migrated `projects/the-menu/` to native 63×88 mm overview cards (`template/overview.js`), `docs/rules/`, and `docs/card-list/`.
+- [x] `[ADR-0006]` Refactored DeckPress core to be fully game-agnostic: dynamic CSV column schema & built-in Excel-like `Data` editor, generic `{{count:field=val}}` doc filters, extracted pure print/duplex engine (`src/shared/print.ts`), lazy-loaded CodeMirror 6 syntax highlighting, and moved *The Menu*'s display fonts & food SVG icons into `projects/the-menu/`.

@@ -42,16 +42,11 @@ export interface RenderDocContext {
 }
 
 function resolvePaletteColor(token: string, palette: Record<string, string>): string {
-  const clean = token.trim().replace(/^c(?=[A-Z]{2,})/, '');
+  const clean = token.trim();
   if (/^#[0-9a-fA-F]{3,8}$/.test(clean)) return clean;
   if (clean.toLowerCase() === 'ink') return '#141414';
   if (clean.toLowerCase() === 'muted') return '#555555';
-  return palette[clean] || palette[clean.toUpperCase()] || palette.default || '#141414';
-}
-
-function isOverviewCard(card: ExpandedCard): boolean {
-  const g = (card.type_group || '').trim().toLowerCase();
-  return g === 'prehľad' || g === 'prehlad' || g === 'overview';
+  return palette[clean] || palette[clean.toUpperCase()] || palette[clean.toLowerCase()] || palette.default || '#141414';
 }
 
 function renderCardThumbnail(
@@ -90,26 +85,35 @@ function renderCardThumbnail(
   return `<figure class="dp-doc-card-fig"><div class="dp-doc-card-frame" style="width:${widthMm}mm;height:${heightMm}mm"><div class="dp-doc-card-scaler" style="width:${zeroBleedSize.widthMm}mm;height:${zeroBleedSize.heightMm}mm;transform:scale(${scale.toFixed(5)})">${rawHtml}</div></div>${captionHtml}</figure>`;
 }
 
+/**
+ * Generic CSV filter counter for `{{count:...}}` directives:
+ * - `all` -> total expanded cards
+ * - `field=value` (exact, case-insensitive)
+ * - `field!=value` (not equal)
+ * - `field~substr` (contains substring, case-insensitive)
+ * - Combine multiple clauses with `&`, e.g. `type_group=Surovina & kitchen=TAL`
+ */
 function computeCount(spec: string, cards: ExpandedCard[]): number {
   const s = spec.trim();
-  const playable = cards.filter((c) => !isOverviewCard(c));
-  if (s === 'total' || s === 'playable') return playable.length;
-  if (s === 'all') return cards.length;
-  if (s.startsWith('kitchen:')) {
-    const k = s.slice('kitchen:'.length).trim().toUpperCase();
-    if (k === 'DUAL') {
-      return playable.filter(
-        (c) =>
-          c.type_group === 'Surovina' &&
-          (c.kitchen.includes(',') || c.kitchen.includes('~')),
-      ).length;
-    }
-    return playable.filter(
-      (c) => c.type_group === 'Surovina' && c.kitchen.trim().toUpperCase() === k,
-    ).length;
-  }
-  const target = s.toLowerCase();
-  return playable.filter((c) => (c.type_group || '').trim().toLowerCase() === target).length;
+  if (!s || s === 'all') return cards.length;
+
+  const clauses = s.split('&').map((c) => c.trim()).filter(Boolean);
+  return cards.filter((card) =>
+    clauses.every((clause) => {
+      const m = clause.match(/^([a-zA-Z0-9_]+)\s*(!=|=|~)\s*(.*)$/);
+      if (!m) {
+        // Bare value matches `type_group` for convenience
+        return String(card.type_group || '').trim().toLowerCase() === clause.toLowerCase();
+      }
+      const [, field, op, rawVal] = m;
+      const expected = rawVal.trim().replace(/^["']|["']$/g, '').toLowerCase();
+      const actual = String(card[field] ?? '').trim().toLowerCase();
+      if (op === '=') return actual === expected;
+      if (op === '!=') return actual !== expected;
+      if (op === '~') return actual.includes(expected);
+      return false;
+    }),
+  ).length;
 }
 
 function expandDirectives(
@@ -138,7 +142,7 @@ function expandDirectives(
     }
 
     if (name === 'count') {
-      return String(computeCount(arg || 'playable', ctx.cards));
+      return String(computeCount(arg || 'all', ctx.cards));
     }
 
     if (name === 'card') {
@@ -550,8 +554,7 @@ ${buildDocPaletteVarsCss(variant)}
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 7.5mm;
-  padding: 0.3mm 1.2mm;
+  padding: 0.3mm 1.3mm;
   border-radius: 0.8mm;
   color: #FFFFFF;
   font-size: 7pt;
@@ -647,12 +650,10 @@ export function renderProjectDocHtml(ctx: RenderDocContext): {
   // Programmatic doc (`render.js`), e.g. auto-generated Card List
   if (ctx.doc.renderJs && ctx.doc.renderJs.trim()) {
     try {
-      const playableCards = ctx.cards.filter((c) => !isOverviewCard(c));
       // eslint-disable-next-line no-new-func
       const fn = new Function('ctx', 'helpers', ctx.doc.renderJs) as (
         renderCtx: {
           cards: ExpandedCard[];
-          playableCards: ExpandedCard[];
           variant: DesignVariant;
           cardSize: CardSize;
           meta: ProjectDoc['meta'];
@@ -668,7 +669,6 @@ export function renderProjectDocHtml(ctx: RenderDocContext): {
         fn(
           {
             cards: ctx.cards,
-            playableCards,
             variant: ctx.variant,
             cardSize: ctx.cardSize,
             meta: ctx.doc.meta,

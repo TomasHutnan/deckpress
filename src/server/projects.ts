@@ -6,7 +6,7 @@ import {
 } from '../shared/controls.js';
 import {
   createBlankDesign,
-  createMenuTemplateDesign,
+  createStarterDesign,
   createStarterProjectConfig,
   STARTER_CSV,
 } from '../shared/defaults.js';
@@ -304,7 +304,7 @@ export async function loadProject(slug: string): Promise<LoadedProject> {
       ),
       readJsonOrDefault<DesignConfig>(
         path.join(dir, 'design.json'),
-        createMenuTemplateDesign(),
+        createStarterDesign(),
       ),
       readJsonOrDefault<ControlsSchema>(
         path.join(dir, 'controls.json'),
@@ -379,7 +379,7 @@ async function ensureProjectScaffold(
 
   const config = createStarterProjectConfig(name, slug);
   if (googleSheetUrl) config.googleSheetUrl = googleSheetUrl;
-  const design = mode === 'blank' ? createBlankDesign() : createMenuTemplateDesign();
+  const design = mode === 'blank' ? createBlankDesign() : createStarterDesign();
 
   await writeIfMissing(path.join(dir, 'project.json'), JSON.stringify(config, null, 2) + '\n');
   await writeIfMissing(path.join(dir, 'design.json'), JSON.stringify(design, null, 2) + '\n');

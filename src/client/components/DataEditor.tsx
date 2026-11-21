@@ -4,7 +4,9 @@ import type { CardRow } from '../../shared/types';
 
 interface DataEditorProps {
   slug: string;
+  columns: string[];
   rows: CardRow[];
+  onColumnsChange: (next: string[]) => void;
   onRowsChange: (next: CardRow[]) => void;
   onUploadCsv: (file: File) => Promise<void>;
 }
@@ -16,21 +18,14 @@ interface ColDef {
   isNumber?: boolean;
 }
 
-const BASE_COLUMNS: ColDef[] = [
-  { key: 'id', label: 'id', width: 92 },
-  { key: 'type_group', label: 'type_group', width: 95 },
-  { key: 'kitchen', label: 'kitchen', width: 82 },
-  { key: 'size', label: 'size', width: 82 },
-  { key: 'title', label: 'title', width: 170 },
-  { key: 'subtitle', label: 'subtitle', width: 195 },
-  { key: 'tags_str', label: 'tags_str', width: 95 },
-  { key: 'count', label: 'count', width: 58, isNumber: true },
-  { key: 'is_action', label: 'is_action', width: 70 },
-  { key: 'joins_dish', label: 'joins_dish', width: 74 },
-  { key: 'description', label: 'description', width: 260 },
-  { key: 'recipe_change', label: 'recipe_change', width: 105 },
-  { key: 'image', label: 'image', width: 120 },
-];
+function estimateColWidth(key: string): number {
+  const k = key.toLowerCase();
+  if (k === 'count' || k === 'qty' || k === 'quantity') return 62;
+  if (k === 'id') return 92;
+  if (k === 'description' || k === 'text' || k === 'effect') return 260;
+  if (k === 'title' || k === 'name' || k === 'subtitle') return 175;
+  return 100;
+}
 
 interface CellPos {
   row: number;
@@ -39,13 +34,14 @@ interface CellPos {
 
 export function DataEditor({
   slug,
+  columns: propColumns,
   rows,
+  onColumnsChange,
   onRowsChange,
   onUploadCsv,
 }: DataEditorProps) {
   const [filterType, setFilterType] = useState('all');
   const [search, setSearch] = useState('');
-  const [extraColumns, setExtraColumns] = useState<string[]>([]);
   const [anchor, setAnchor] = useState<CellPos>({ row: 0, col: 0 });
   const [focusCell, setFocusCell] = useState<CellPos>({ row: 0, col: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -55,20 +51,25 @@ export function DataEditor({
   const tableRef = useRef<HTMLDivElement | null>(null);
 
   const columns = useMemo<ColDef[]>(() => {
-    const baseKeys = new Set(BASE_COLUMNS.map((c) => c.key));
-    const discovered = new Set<string>(extraColumns);
+    const ordered = new Set<string>(propColumns);
     for (const r of rows) {
       for (const k of Object.keys(r)) {
-        if (k.startsWith('_') || baseKeys.has(k)) continue;
-        if (k === 'color' && !r.color) continue;
-        if (r[k] !== undefined && r[k] !== '') discovered.add(k);
+        if (!k.startsWith('_')) ordered.add(k);
       }
     }
-    return [
-      ...BASE_COLUMNS,
-      ...Array.from(discovered).map((k) => ({ key: k, label: k, width: 120 })),
-    ];
-  }, [rows, extraColumns]);
+    if (ordered.size === 0) {
+      ordered.add('id');
+      ordered.add('type_group');
+      ordered.add('title');
+      ordered.add('count');
+    }
+    return Array.from(ordered).map((key) => ({
+      key,
+      label: key,
+      width: estimateColWidth(key),
+      isNumber: key === 'count' || key === 'quantity',
+    }));
+  }, [propColumns, rows]);
 
   const typeGroups = useMemo(() => {
     const set = new Set<string>();
@@ -84,8 +85,10 @@ export function DataEditor({
     rows.forEach((r, idx) => {
       if (filterType !== 'all' && r.type_group !== filterType) return;
       if (q) {
-        const hay = `${r.id} ${r.type_group} ${r.kitchen} ${r.title} ${r.subtitle} ${r.tags_str} ${r.description}`.toLowerCase();
-        if (!hay.includes(q)) return;
+        const matched = Object.values(r).some(
+          (v) => v !== undefined && v !== null && String(v).toLowerCase().includes(q),
+        );
+        if (!matched) return;
       }
       out.push(idx);
     });
@@ -287,22 +290,20 @@ export function DataEditor({
     const nextNum = rows.length + 1;
     const newRow: CardRow = {
       id: `CARD_${String(nextNum).padStart(3, '0')}`,
-      type_group: filterType !== 'all' ? filterType : 'Surovina',
-      kitchen: '',
-      color: '',
-      size: 'celá',
-      title: 'NOVÁ KARTA',
-      subtitle: '',
-      tags_str: '',
       count: 1,
-      image: '',
-      is_action: '0',
-      joins_dish: '1',
-      description: '',
     };
+    for (const col of columns) {
+      if (col.key === 'id' || col.key === 'count') continue;
+      if (col.key === 'type_group' && filterType !== 'all') {
+        newRow[col.key] = filterType;
+      } else {
+        newRow[col.key] = '';
+      }
+    }
     const next = [...rows, newRow];
     onRowsChange(next);
-    const pos = { row: visibleIndices.length, col: 4 };
+    const titleCol = Math.max(0, columns.findIndex((c) => c.key === 'title'));
+    const pos = { row: visibleIndices.length, col: titleCol };
     setAnchor(pos);
     setFocusCell(pos);
   };
@@ -323,7 +324,7 @@ export function DataEditor({
       alert(`Column "${clean}" already exists.`);
       return;
     }
-    setExtraColumns((prev) => [...prev, clean]);
+    onColumnsChange([...columns.map((c) => c.key), clean]);
     onRowsChange(rows.map((r) => ({ ...r, [clean]: r[clean] ?? '' })));
     const newColIdx = columns.length;
     setAnchor({ row: focusCell.row, col: newColIdx });

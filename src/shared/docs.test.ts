@@ -1,61 +1,41 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createMenuTemplateDesign } from './defaults.js';
+import { createStarterDesign } from './defaults.js';
 import { getDocPageDims, renderProjectDocHtml } from './docs.js';
+import { renderPrintDocumentHtml } from './print.js';
 import { compileTemplateFiles } from './runtime.js';
 import type { ExpandedCard, ProjectDoc } from './types.js';
 
 const SAMPLE_CARDS: ExpandedCard[] = [
   {
     id: 'CARD_001',
-    type_group: 'Surovina',
-    kitchen: 'TAL',
-    color: '',
-    size: 'celá',
-    title: 'CESTOVINY',
-    subtitle: 'FETTUCCINE',
-    tags_str: 'TAL V',
+    type_group: 'Unit',
+    faction: 'primary',
+    title: 'SCOUT',
     count: 1,
-    image: '',
-    is_action: '0',
-    description: '',
-    _copyIndex: 0,
+    _copyIndex: 1,
     _totalCopies: 1,
-    _instanceKey: 'CARD_001#1',
+    _instanceKey: 'CARD_001',
   },
   {
-    id: 'CARD_075',
-    type_group: 'Akcia',
-    kitchen: '',
-    color: '',
-    size: '',
-    title: 'DUPĽA',
-    subtitle: 'VYLOŽ HNEĎ PO AKČNEJ KARTE',
-    tags_str: '',
+    id: 'CARD_002',
+    type_group: 'Action',
+    faction: 'accent',
+    title: 'SURGE',
     count: 1,
-    image: '',
-    is_action: '1',
-    description: 'Zopakuj účinok',
-    _copyIndex: 0,
+    _copyIndex: 1,
     _totalCopies: 1,
-    _instanceKey: 'CARD_075#1',
+    _instanceKey: 'CARD_002',
   },
   {
-    id: 'OV_FRONT',
-    type_group: 'Prehľad',
-    kitchen: '',
-    color: '',
-    size: '',
-    title: 'PREHĽAD',
-    subtitle: '',
-    tags_str: '',
+    id: 'REF_001',
+    type_group: 'Reference',
+    faction: '',
+    title: 'PLAYER AID',
     count: 1,
-    image: '',
-    is_action: '0',
-    description: '',
-    _copyIndex: 0,
+    _copyIndex: 1,
     _totalCopies: 1,
-    _instanceKey: 'OV_FRONT#1',
+    _instanceKey: 'REF_001',
   },
 ];
 
@@ -64,15 +44,15 @@ test('getDocPageDims returns portrait and landscape dimensions', () => {
   assert.deepEqual(getDocPageDims('A4', 'landscape'), { widthMm: 297, heightMm: 210 });
 });
 
-test('renderProjectDocHtml expands Markdown, colored headings, counts, pills, cards, and diagrams', () => {
-  const design = createMenuTemplateDesign();
+test('renderProjectDocHtml expands Markdown, colored headings, generic count filters, pills, cards, and diagrams', () => {
+  const design = createStarterDesign();
   const variant = design.variants[design.activeVariant];
   const { renderer } = compileTemplateFiles(undefined);
 
   const doc: ProjectDoc = {
     id: 'rules',
     meta: {
-      title: 'Pravidlá',
+      title: 'Rules',
       pageSize: 'A4',
       orientation: 'landscape',
       columns: 3,
@@ -81,23 +61,23 @@ test('renderProjectDocHtml expands Markdown, colored headings, counts, pills, ca
     stylesCss: '.custom-rule { color: red; }',
     sections: {
       '01-intro.md': [
-        '## [TAL] Cieľ hry ({{count:playable}} kariet)',
-        'Hraj s {{pill:TAL}} kartami ({{count:kitchen:TAL}} TAL, {{count:Akcia}} Akčné).',
+        '## [primary] Goal ({{count:type_group!=Reference}} playable)',
+        'Play with {{pill:primary}} cards ({{count:type_group=Unit & faction=primary}} units, {{count:type_group=Action}} actions).',
         '',
-        '1. **Ťahanie**',
-        '  - **A:** 2 karty',
-        '  - **B:** 1 z Obchodu',
+        '1. **Draw**',
+        '  - **A:** 2 cards',
+        '  - **B:** 1 from market',
         '',
-        '{{card-row: width=18mm CARD_001 "Celá" | + | CARD_075}}',
+        '{{card-row: width=18mm CARD_001 "Unit" | + | CARD_002}}',
         '{{diagram:sample}}',
         '---page---',
       ].join('\n'),
       '02-back.md': [
-        '> **Príklad:** 5 bodov',
+        '> **Example:** 5 points',
         '',
-        '| Cesta | Body |',
+        '| Path | Points |',
         '| --- | ---: |',
-        '| 3 rovnaké | **5 b.** |',
+        '| 3 matching | **5 pts** |',
       ].join('\n'),
     },
     diagrams: {
@@ -116,22 +96,20 @@ test('renderProjectDocHtml expands Markdown, colored headings, counts, pills, ca
   });
 
   assert.equal(res.error, null);
-  // Two pages separated by ---page---
   assert.equal((res.bodyHtml.match(/class="dp-doc-page"/g) || []).length, 2);
-  // Playable count excludes Prehľad overview card (2 instead of 3)
-  assert.ok(res.bodyHtml.includes('Cieľ hry (2 kariet)'));
-  assert.ok(res.bodyHtml.includes('1 TAL, 1 Akčné'));
+  assert.ok(res.bodyHtml.includes('Goal (2 playable)'));
+  assert.ok(res.bodyHtml.includes('1 units, 1 actions'));
   assert.ok(res.bodyHtml.includes('dp-doc-pill'));
   assert.ok(res.bodyHtml.includes('dp-doc-card-row'));
-  assert.ok(res.bodyHtml.includes('dp-doc-card-caption">Celá</div>'));
+  assert.ok(res.bodyHtml.includes('dp-doc-card-caption">Unit</div>'));
   assert.ok(res.bodyHtml.includes('dp-doc-diagram'));
   assert.ok(res.bodyHtml.includes('dp-doc-callout'));
   assert.ok(res.bodyHtml.includes('dp-doc-table'));
-  assert.ok(res.bodyHtml.includes('<ul><li><strong>A:</strong> 2 karty</li>'));
+  assert.ok(res.bodyHtml.includes('<ul><li><strong>A:</strong> 2 cards</li>'));
 });
 
 test('renderProjectDocHtml executes programmatic render.js docs', () => {
-  const design = createMenuTemplateDesign();
+  const design = createStarterDesign();
   const variant = design.variants[design.activeVariant];
   const { renderer } = compileTemplateFiles(undefined);
 
@@ -141,7 +119,7 @@ test('renderProjectDocHtml executes programmatic render.js docs', () => {
     stylesCss: '',
     sections: {},
     diagrams: {},
-    renderJs: `return '<section class="dp-doc-page">Total: ' + ctx.playableCards.length + '</section>';`,
+    renderJs: `return '<section class="dp-doc-page">Total: ' + ctx.cards.length + '</section>';`,
   };
 
   const res = renderProjectDocHtml({
@@ -155,12 +133,11 @@ test('renderProjectDocHtml executes programmatic render.js docs', () => {
   });
 
   assert.equal(res.error, null);
-  assert.ok(res.bodyHtml.includes('Total: 2'));
+  assert.ok(res.bodyHtml.includes('Total: 3'));
 });
 
-test('renderPrintDocumentHtml mirrors back sheets for duplex printing', async () => {
-  const { renderPrintDocumentHtml } = await import('./renderCard.js');
-  const design = createMenuTemplateDesign();
+test('renderPrintDocumentHtml mirrors back sheets for duplex printing', () => {
+  const design = createStarterDesign();
   const variant = design.variants[design.activeVariant];
   const html = renderPrintDocumentHtml({
     cards: SAMPLE_CARDS.slice(0, 2),
@@ -181,36 +158,7 @@ test('renderPrintDocumentHtml mirrors back sheets for duplex printing', async ()
     preRenderedBacksHtml: ['<div class="b1">B1</div>', '<div class="b2">B2</div>'],
   });
 
-  // 1 front sheet + 1 mirrored back sheet
   assert.equal((html.match(/class="dp-sheet"/g) || []).length, 2);
-  // Row of 3 cols: [B1, B2, empty] mirrored -> [empty, B2, B1]
   assert.ok(html.indexOf('dp-empty-slot') < html.indexOf('class="b2"'));
   assert.ok(html.indexOf('class="b2"') < html.indexOf('class="b1"'));
-});
-
-test('serializeCsv and parseCsv round-trip Slovak text, commas, and quotes', async () => {
-  const { parseCsv, serializeCsv } = await import('./csv.js');
-  const rows = [
-    {
-      id: 'CARD_103',
-      type_group: 'Akcia',
-      kitchen: '',
-      color: '',
-      size: '',
-      title: 'EŠTE RAZ, POPROSÍM',
-      subtitle: 'ZAHRAJ KEDYKOĽVEK\\nNEPOČÍTA SA DO LIMITU',
-      tags_str: '',
-      count: 2,
-      image: '',
-      is_action: '1',
-      description: 'Zopakuj „účinok“ karty',
-    },
-  ];
-  const csv = serializeCsv(rows);
-  const parsed = parseCsv(csv);
-  assert.equal(parsed.length, 1);
-  assert.equal(parsed[0].title, 'EŠTE RAZ, POPROSÍM');
-  assert.equal(parsed[0].subtitle, 'ZAHRAJ KEDYKOĽVEK\\nNEPOČÍTA SA DO LIMITU');
-  assert.equal(parsed[0].count, 2);
-  assert.equal(parsed[0].description, 'Zopakuj „účinok“ karty');
 });
