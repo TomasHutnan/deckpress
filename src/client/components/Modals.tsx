@@ -305,7 +305,7 @@ export function NewProjectModal({
   onCreated: (project: LoadedProject) => void;
 }) {
   const [name, setName] = useState('');
-  const [mode, setMode] = useState<'template' | 'blank' | 'clone'>('template');
+  const [mode, setMode] = useState<'template' | 'demo' | 'blank' | 'clone'>('template');
   const [repoUrl, setRepoUrl] = useState('');
   const [token, setToken] = useState('');
   const [saveToken, setSaveToken] = useState(true);
@@ -363,7 +363,17 @@ export function NewProjectModal({
               className={`pill ${mode === 'template' ? 'active' : ''}`}
               onClick={() => setMode('template')}
             >
-              Swiss Template
+              Starter Template
+            </button>
+            <button
+              type="button"
+              className={`pill ${mode === 'demo' ? 'active' : ''}`}
+              onClick={() => {
+                setMode('demo');
+                if (!name.trim()) setName('Classic Playing Cards');
+              }}
+            >
+              Demo: Playing Cards
             </button>
             <button
               type="button"

@@ -1,0 +1,17 @@
+{
+  "title": "Classic Games Rulebook",
+  "order": 1,
+  "defaultZoom": 0.72,
+  "minZoom": 0.4,
+  "maxZoom": 1.5,
+  "zoomStep": 0.05,
+  "pageSize": "A4",
+  "orientation": "landscape",
+  "columns": 3,
+  "marginMm": 9.5,
+  "sections": [
+    "01-deck-and-poker.md",
+    "02-crazy-eights.md",
+    "03-blackjack.md"
+  ]
+}

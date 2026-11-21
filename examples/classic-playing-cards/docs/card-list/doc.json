@@ -1,0 +1,12 @@
+{
+  "title": "Deck Manifest",
+  "order": 2,
+  "defaultZoom": 0.82,
+  "minZoom": 0.4,
+  "maxZoom": 1.6,
+  "zoomStep": 0.05,
+  "pageSize": "A4",
+  "orientation": "portrait",
+  "columns": 1,
+  "marginMm": 10
+}

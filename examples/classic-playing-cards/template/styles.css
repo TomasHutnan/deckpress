@@ -1,0 +1,439 @@
+/* Styles for "Classic Playing Cards" demo project */
+
+.dp-card {
+  position: relative;
+  box-sizing: border-box;
+  width: calc(var(--pc-w) + var(--pc-bleed) * 2);
+  height: calc(var(--pc-h) + var(--pc-bleed) * 2);
+  padding: var(--pc-bleed);
+  background: var(--dp-bg, #FAF8F4);
+  color: var(--dp-fg, #141414);
+  overflow: hidden;
+  font-family: var(--dp-body-font, 'Inter', sans-serif);
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.dp-trim-area {
+  position: relative;
+  width: var(--pc-w);
+  height: var(--pc-h);
+  overflow: visible;
+  background: var(--dp-bg, #FAF8F4);
+}
+
+.dp-card:not(.is-card-back) .dp-trim-area {
+  overflow: hidden;
+}
+
+/* Optional background canvas layers */
+.pc-canvas-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.pc-pattern-icon {
+  position: absolute;
+}
+
+/* Corner Indices */
+.pc-index {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 8.5mm;
+  line-height: 1;
+  z-index: 4;
+}
+
+.pc-index-tl {
+  top: 3.4mm;
+  left: 2.4mm;
+}
+
+.pc-index-br {
+  bottom: 3.4mm;
+  right: 2.4mm;
+  transform: rotate(180deg);
+}
+
+.pc-idx-rank {
+  font-family: var(--dp-title-font, 'Oswald', sans-serif);
+  font-size: var(--dp-title-size, 15pt);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 0.92;
+}
+
+.pc-idx-rank.is-ten {
+  letter-spacing: -0.09em;
+  font-size: calc(var(--dp-title-size, 15pt) * 0.88);
+}
+
+.pc-idx-pip {
+  width: 4.3mm;
+  height: 4.3mm;
+  margin-top: 0.8mm;
+}
+
+/* Number Card Pip Stage */
+.pc-pip-stage {
+  position: absolute;
+  top: 8.5mm;
+  bottom: 8.5mm;
+  left: 11mm;
+  right: 11mm;
+  z-index: 2;
+}
+
+.pc-pip {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pc-pip.is-flipped {
+  transform: translate(-50%, -50%) rotate(180deg);
+}
+
+.pc-pip-svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* Ace Centerpiece */
+.pc-ace-stage {
+  position: absolute;
+  inset: 7.5mm 10.5mm;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+}
+
+.pc-ace-stage.has-frame {
+  border: 0.35mm solid color-mix(in srgb, var(--pc-suit) 24%, transparent);
+  border-radius: 1.5mm;
+}
+
+.pc-ace-ornament {
+  position: absolute;
+  width: 42mm;
+  height: 42mm;
+  pointer-events: none;
+}
+
+.pc-ace-emblem {
+  position: relative;
+  width: 21mm;
+  height: 21mm;
+  z-index: 2;
+}
+
+.pc-ace-emblem.is-spades {
+  width: 25mm;
+  height: 25mm;
+}
+
+.pc-ace-svg {
+  width: 100%;
+  height: 100%;
+}
+
+.pc-ace-edition {
+  position: absolute;
+  bottom: 5mm;
+  font-family: var(--dp-sub-font, 'Space Grotesk', sans-serif);
+  font-size: 6.2pt;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  opacity: 0.65;
+}
+
+/* Double-headed Court Cards */
+.pc-court-frame {
+  position: absolute;
+  inset: 6.5mm 11mm;
+  display: flex;
+  flex-direction: column;
+  z-index: 2;
+  overflow: hidden;
+  border-radius: 1.4mm;
+}
+
+.pc-court-frame.has-frame {
+  border: 0.45mm solid color-mix(in srgb, var(--pc-suit) 42%, transparent);
+  box-shadow: inset 0 0 0 0.7mm var(--dp-bg), inset 0 0 0 1mm color-mix(in srgb, var(--pc-gold) 45%, transparent);
+}
+
+.pc-court-top,
+.pc-court-bottom {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pc-court-bottom {
+  transform: rotate(180deg);
+}
+
+.pc-court-half {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pc-court-art {
+  width: 92%;
+  height: 92%;
+}
+
+.pc-court-pip-badge {
+  position: absolute;
+  top: 2mm;
+  right: 2.2mm;
+  width: 4.5mm;
+  height: 4.5mm;
+}
+
+.pc-court-pip-svg {
+  width: 100%;
+  height: 100%;
+}
+
+.pc-court-divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2mm;
+  height: 4.2mm;
+  border-top: 0.3mm solid color-mix(in srgb, var(--pc-gold) 55%, transparent);
+  border-bottom: 0.3mm solid color-mix(in srgb, var(--pc-gold) 55%, transparent);
+  background: color-mix(in srgb, var(--pc-gold) 12%, transparent);
+  color: var(--pc-suit);
+}
+
+.pc-court-sash-diamond {
+  width: 1.6mm;
+  height: 1.6mm;
+  background: var(--pc-gold);
+  transform: rotate(45deg);
+}
+
+.pc-court-sash-label {
+  font-family: var(--dp-sub-font, 'Space Grotesk', sans-serif);
+  font-size: 6.5pt;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+/* Joker Cards */
+.pc-joker-idx {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-family: var(--dp-title-font, 'Oswald', sans-serif);
+  font-size: 7.4pt;
+  font-weight: 700;
+  line-height: 1.05;
+  z-index: 4;
+}
+
+.pc-joker-tl {
+  top: 4mm;
+  left: 3.4mm;
+}
+
+.pc-joker-br {
+  bottom: 4mm;
+  right: 3.4mm;
+  transform: rotate(180deg);
+}
+
+.pc-joker-stage {
+  position: absolute;
+  inset: 7mm 9.5mm;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+}
+
+.pc-joker-stage.has-frame {
+  border: 0.4mm solid color-mix(in srgb, var(--pc-suit) 35%, transparent);
+  border-radius: 1.6mm;
+}
+
+.pc-joker-svg {
+  width: 39mm;
+  height: 55mm;
+}
+
+.pc-joker-banner {
+  margin-top: 1mm;
+  font-family: var(--dp-sub-font, 'Space Grotesk', sans-serif);
+  font-size: 7.4pt;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+
+/* Reference Cards (63x88mm) */
+.pc-ref-card {
+  position: absolute;
+  inset: 3.5mm;
+  display: flex;
+  flex-direction: column;
+  border: 0.4mm solid color-mix(in srgb, var(--pc-ink) 25%, transparent);
+  border-radius: 1.4mm;
+  overflow: hidden;
+  z-index: 2;
+}
+
+.pc-ref-header {
+  padding: 2.2mm 2.6mm;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4mm;
+}
+
+.pc-ref-title {
+  font-family: var(--dp-title-font, 'Oswald', sans-serif);
+  font-size: 10.5pt;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1;
+}
+
+.pc-ref-sub {
+  font-family: var(--dp-sub-font, 'Space Grotesk', sans-serif);
+  font-size: 5.5pt;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  opacity: 0.8;
+}
+
+.pc-ref-list {
+  flex: 1;
+  padding: 1.6mm 2.2mm;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.pc-ref-row {
+  display: flex;
+  align-items: center;
+  gap: 1.8mm;
+  font-size: calc(var(--dp-body-size, 7.2pt) * 0.86);
+  line-height: 1.1;
+}
+
+.pc-ref-num {
+  width: 3.6mm;
+  height: 3.6mm;
+  border-radius: 0.6mm;
+  color: #FFFFFF;
+  font-weight: 800;
+  font-size: 5.6pt;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.pc-ref-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.pc-ref-text strong {
+  font-size: 6.4pt;
+}
+
+.pc-ref-text span {
+  font-size: 5.4pt;
+  opacity: 0.72;
+}
+
+.pc-ref-footer {
+  display: flex;
+  justify-content: center;
+  gap: 3mm;
+  padding: 1.4mm;
+  border-top: 0.25mm solid color-mix(in srgb, var(--pc-ink) 14%, transparent);
+}
+
+.pc-ref-pip {
+  width: 2.8mm;
+  height: 2.8mm;
+  opacity: 0.55;
+}
+
+.pc-ref-body {
+  flex: 1;
+  padding: 2.2mm 2.4mm;
+  display: flex;
+  flex-direction: column;
+  gap: 2.5mm;
+}
+
+.pc-ref-block-title {
+  font-family: var(--dp-sub-font, 'Space Grotesk', sans-serif);
+  font-size: 6.8pt;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  margin-bottom: 0.8mm;
+}
+
+.pc-ref-block ul {
+  margin: 0;
+  padding-left: 3.2mm;
+  font-size: calc(var(--dp-body-size, 7.2pt) * 0.88);
+  line-height: 1.28;
+}
+
+.pc-ref-block li {
+  margin-bottom: 0.5mm;
+}
+
+.pc-ref-note {
+  text-align: center;
+  font-size: 5.2pt;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  opacity: 0.5;
+  padding: 1.4mm;
+  border-top: 0.25mm solid color-mix(in srgb, var(--pc-ink) 14%, transparent);
+}
+
+/* Card Back (extends cleanly into bleed) */
+.pc-back-bleed {
+  position: absolute;
+}
+
+.pc-back-inner {
+  position: absolute;
+  border-radius: 2mm;
+  overflow: hidden;
+}
+
+.pc-back-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}

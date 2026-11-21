@@ -36,6 +36,10 @@ export function getProjectsRoot(): string {
   return path.resolve(process.cwd(), 'projects');
 }
 
+export function getDemoProjectDir(): string {
+  return path.resolve(process.cwd(), 'examples', 'classic-playing-cards');
+}
+
 export function sanitizeSlug(input: string): string {
   const slug = input
     .toLowerCase()
@@ -87,7 +91,20 @@ export interface ProjectSummary {
 export async function listProjects(): Promise<ProjectSummary[]> {
   const root = getProjectsRoot();
   await fs.mkdir(root, { recursive: true });
-  const entries = await fs.readdir(root, { withFileTypes: true });
+  let entries = await fs.readdir(root, { withFileTypes: true });
+
+  // Seed the bundled Classic Playing Cards showcase on first run when projects/ is empty
+  const hasAnyProject = entries.some((e) => e.isDirectory() && !e.name.startsWith('.'));
+  if (!hasAnyProject) {
+    try {
+      await fs.access(getDemoProjectDir());
+      await createProject({ name: 'Classic Playing Cards', mode: 'demo' });
+      entries = await fs.readdir(root, { withFileTypes: true });
+    } catch {
+      // No bundled demo directory available; continue with empty list
+    }
+  }
+
   const projects: ProjectSummary[] = [];
 
   for (const entry of entries) {
@@ -323,7 +340,7 @@ export async function loadProject(slug: string): Promise<LoadedProject> {
 
 export async function createProject(params: {
   name: string;
-  mode: 'blank' | 'template' | 'clone';
+  mode: 'blank' | 'template' | 'demo' | 'clone';
   repoUrl?: string;
   token?: string;
   saveToken?: boolean;
@@ -349,6 +366,23 @@ export async function createProject(params: {
     }
     // Ensure required project files exist even if cloning an empty/partial repo
     await ensureProjectScaffold(dir, params.name, slug, 'template');
+    return loadProject(slug);
+  }
+
+  if (params.mode === 'demo') {
+    const demoDir = getDemoProjectDir();
+    await fs.access(demoDir);
+    await fs.cp(demoDir, dir, { recursive: true });
+    const cfgPath = path.join(dir, 'project.json');
+    const cfg = await readJsonOrDefault<ProjectConfig>(
+      cfgPath,
+      createStarterProjectConfig(params.name, slug),
+    );
+    cfg.name = params.name;
+    cfg.slug = slug;
+    if (params.googleSheetUrl) cfg.googleSheetUrl = params.googleSheetUrl;
+    await fs.writeFile(cfgPath, JSON.stringify(cfg, null, 2) + '\n', 'utf8');
+    await initProjectRepo(dir, `chore: initialize ${params.name} from demo`);
     return loadProject(slug);
   }
 

@@ -1,0 +1,56 @@
+id,type_group,suit,rank,value,title,subtitle,count,description
+S_A,Ace,spades,A,14,Ace of Spades,HIGHEST TRUMP,1,High (14) or Low (1) in straights; 11 or 1 in Blackjack.
+S_2,Number,spades,2,2,Two of Spades,SPADES,1,Standard playing card.
+S_3,Number,spades,3,3,Three of Spades,SPADES,1,Standard playing card.
+S_4,Number,spades,4,4,Four of Spades,SPADES,1,Standard playing card.
+S_5,Number,spades,5,5,Five of Spades,SPADES,1,Standard playing card.
+S_6,Number,spades,6,6,Six of Spades,SPADES,1,Standard playing card.
+S_7,Number,spades,7,7,Seven of Spades,SPADES,1,Standard playing card.
+S_8,Number,spades,8,8,Eight of Spades,WILD IN CRAZY 8S,1,Wild card in Crazy Eights: declare any suit.
+S_9,Number,spades,9,9,Nine of Spades,SPADES,1,Standard playing card.
+S_10,Number,spades,10,10,Ten of Spades,SPADES,1,Standard playing card.
+S_J,Court,spades,J,11,Jack of Spades,ROYAL COURT,1,Worth 10 in Blackjack; 11 in Poker ranks.
+S_Q,Court,spades,Q,12,Queen of Spades,ROYAL COURT,1,Worth 10 in Blackjack; 13 penalty points in Hearts.
+S_K,Court,spades,K,13,King of Spades,ROYAL COURT,1,Worth 10 in Blackjack; 13 in Poker ranks.
+H_A,Ace,hearts,A,14,Ace of Hearts,ACE,1,High (14) or Low (1) in straights; 11 or 1 in Blackjack.
+H_2,Number,hearts,2,2,Two of Hearts,HEARTS,1,Standard playing card.
+H_3,Number,hearts,3,3,Three of Hearts,HEARTS,1,Standard playing card.
+H_4,Number,hearts,4,4,Four of Hearts,HEARTS,1,Standard playing card.
+H_5,Number,hearts,5,5,Five of Hearts,HEARTS,1,Standard playing card.
+H_6,Number,hearts,6,6,Six of Hearts,HEARTS,1,Standard playing card.
+H_7,Number,hearts,7,7,Seven of Hearts,HEARTS,1,Standard playing card.
+H_8,Number,hearts,8,8,Eight of Hearts,WILD IN CRAZY 8S,1,Wild card in Crazy Eights: declare any suit.
+H_9,Number,hearts,9,9,Nine of Hearts,HEARTS,1,Standard playing card.
+H_10,Number,hearts,10,10,Ten of Hearts,HEARTS,1,Standard playing card.
+H_J,Court,hearts,J,11,Jack of Hearts,ROYAL COURT,1,Worth 10 in Blackjack; 11 in Poker ranks.
+H_Q,Court,hearts,Q,12,Queen of Hearts,ROYAL COURT,1,Worth 10 in Blackjack; 12 in Poker ranks.
+H_K,Court,hearts,K,13,King of Hearts,ROYAL COURT,1,Worth 10 in Blackjack; 13 in Poker ranks.
+D_A,Ace,diamonds,A,14,Ace of Diamonds,ACE,1,High (14) or Low (1) in straights; 11 or 1 in Blackjack.
+D_2,Number,diamonds,2,2,Two of Diamonds,DIAMONDS,1,Standard playing card.
+D_3,Number,diamonds,3,3,Three of Diamonds,DIAMONDS,1,Standard playing card.
+D_4,Number,diamonds,4,4,Four of Diamonds,DIAMONDS,1,Standard playing card.
+D_5,Number,diamonds,5,5,Five of Diamonds,DIAMONDS,1,Standard playing card.
+D_6,Number,diamonds,6,6,Six of Diamonds,DIAMONDS,1,Standard playing card.
+D_7,Number,diamonds,7,7,Seven of Diamonds,DIAMONDS,1,Standard playing card.
+D_8,Number,diamonds,8,8,Eight of Diamonds,WILD IN CRAZY 8S,1,Wild card in Crazy Eights: declare any suit.
+D_9,Number,diamonds,9,9,Nine of Diamonds,DIAMONDS,1,Standard playing card.
+D_10,Number,diamonds,10,10,Ten of Diamonds,DIAMONDS,1,Standard playing card.
+D_J,Court,diamonds,J,11,Jack of Diamonds,ROYAL COURT,1,Worth 10 in Blackjack; 11 in Poker ranks.
+D_Q,Court,diamonds,Q,12,Queen of Diamonds,ROYAL COURT,1,Worth 10 in Blackjack; 12 in Poker ranks.
+D_K,Court,diamonds,K,13,King of Diamonds,ROYAL COURT,1,Worth 10 in Blackjack; 13 in Poker ranks.
+C_A,Ace,clubs,A,14,Ace of Clubs,ACE,1,High (14) or Low (1) in straights; 11 or 1 in Blackjack.
+C_2,Number,clubs,2,2,Two of Clubs,CLUBS,1,Standard playing card.
+C_3,Number,clubs,3,3,Three of Clubs,CLUBS,1,Standard playing card.
+C_4,Number,clubs,4,4,Four of Clubs,CLUBS,1,Standard playing card.
+C_5,Number,clubs,5,5,Five of Clubs,CLUBS,1,Standard playing card.
+C_6,Number,clubs,6,6,Six of Clubs,CLUBS,1,Standard playing card.
+C_7,Number,clubs,7,7,Seven of Clubs,CLUBS,1,Standard playing card.
+C_8,Number,clubs,8,8,Eight of Clubs,WILD IN CRAZY 8S,1,Wild card in Crazy Eights: declare any suit.
+C_9,Number,clubs,9,9,Nine of Clubs,CLUBS,1,Standard playing card.
+C_10,Number,clubs,10,10,Ten of Clubs,CLUBS,1,Standard playing card.
+C_J,Court,clubs,J,11,Jack of Clubs,ROYAL COURT,1,Worth 10 in Blackjack; 11 in Poker ranks.
+C_Q,Court,clubs,Q,12,Queen of Clubs,ROYAL COURT,1,Worth 10 in Blackjack; 12 in Poker ranks.
+C_K,Court,clubs,K,13,King of Clubs,ROYAL COURT,1,Worth 10 in Blackjack; 13 in Poker ranks.
+JOKER_1,Joker,color,★,0,Color Joker,WILD CARD,1,Full-color wild card for Rummy, Canasta, or custom house rules.
+JOKER_2,Joker,mono,★,0,Monochrome Joker,WILD CARD,1,Classic ink wild card for Rummy, Canasta, or custom house rules.
+REF_01,Reference,ref,?,0,Player Reference,POKER & QUICK RULES,2,Double-sided pocket reference card: Poker hand rankings on front, Crazy Eights & Blackjack on back.

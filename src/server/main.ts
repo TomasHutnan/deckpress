@@ -80,7 +80,7 @@ app.get('/api/projects', async () => {
 app.post<{
   Body: {
     name: string;
-    mode: 'blank' | 'template' | 'clone';
+    mode: 'blank' | 'template' | 'demo' | 'clone';
     repoUrl?: string;
     token?: string;
     saveToken?: boolean;

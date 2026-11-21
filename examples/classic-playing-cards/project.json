@@ -1,0 +1,12 @@
+{
+  "name": "Classic Playing Cards",
+  "slug": "classic-playing-cards",
+  "description": "Public-domain 56-card French-suited poker deck with 3 design variants, custom backs, reference cards, and printable classic game rules.",
+  "googleSheetUrl": "",
+  "localCsv": "cards.csv",
+  "cardSize": {
+    "widthMm": 63,
+    "heightMm": 88,
+    "bleedMm": 3
+  }
+}

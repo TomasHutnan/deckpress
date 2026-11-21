@@ -1,0 +1,200 @@
+[
+  {
+    "title": "Deck Style & Card Back",
+    "defaultOpen": true,
+    "items": [
+      {
+        "type": "pills",
+        "label": "Suit Pip Style",
+        "path": "deck.pipStyle",
+        "defaultValue": "classic",
+        "options": [
+          { "value": "classic", "label": "Classic" },
+          { "value": "modern", "label": "Geometric" }
+        ]
+      },
+      {
+        "type": "pills",
+        "label": "Card Back Pattern",
+        "path": "deck.backPattern",
+        "defaultValue": "lattice",
+        "options": [
+          { "value": "lattice", "label": "Lattice" },
+          { "value": "starburst", "label": "Starburst" },
+          { "value": "minimal", "label": "Minimal" }
+        ]
+      },
+      {
+        "type": "checkbox",
+        "label": "Show inner border frame on face cards",
+        "path": "deck.showInnerFrame",
+        "defaultValue": true
+      },
+      {
+        "type": "range",
+        "label": "Corner Index Scale",
+        "path": "deck.indexScale",
+        "min": 0.85,
+        "max": 1.25,
+        "step": 0.05,
+        "unit": "×",
+        "defaultValue": 1
+      },
+      {
+        "type": "text",
+        "label": "Deck Edition Mark",
+        "path": "gameMark.text",
+        "defaultValue": "DECKPRESS 54"
+      }
+    ]
+  },
+  {
+    "title": "Suit & Back Palette",
+    "defaultOpen": true,
+    "items": [
+      {
+        "type": "row",
+        "items": [
+          { "type": "color", "label": "Card Face", "path": "backgroundColor", "defaultValue": "#FAF8F4" },
+          { "type": "color", "label": "Primary Ink", "path": "textColor", "defaultValue": "#141414" }
+        ]
+      },
+      {
+        "type": "color-map",
+        "label": "Suits & Back Colors",
+        "path": "palette"
+      }
+    ]
+  },
+  {
+    "title": "Canvas Texture (Empty / Pattern / Watermark)",
+    "defaultOpen": false,
+    "items": [
+      {
+        "type": "pills",
+        "path": "canvas.mode",
+        "defaultValue": "empty",
+        "options": [
+          { "value": "empty", "label": "Clean" },
+          { "value": "pattern", "label": "Suit Pattern" },
+          { "value": "watermark", "label": "Watermark" }
+        ]
+      },
+      {
+        "type": "range",
+        "label": "Pattern Opacity",
+        "path": "canvas.patternOpacity",
+        "min": 0.02,
+        "max": 0.35,
+        "step": 0.01,
+        "percent": true,
+        "defaultValue": 0.06,
+        "showWhen": { "path": "canvas.mode", "equals": "pattern" }
+      },
+      {
+        "type": "range",
+        "label": "Icon Count",
+        "path": "canvas.patternDensity",
+        "min": 4,
+        "max": 20,
+        "step": 1,
+        "defaultValue": 10,
+        "showWhen": { "path": "canvas.mode", "equals": "pattern" }
+      },
+      {
+        "type": "range",
+        "label": "Icon Scale",
+        "path": "canvas.patternScale",
+        "min": 0.5,
+        "max": 1.8,
+        "step": 0.1,
+        "unit": "×",
+        "defaultValue": 0.9,
+        "showWhen": { "path": "canvas.mode", "equals": "pattern" }
+      },
+      {
+        "type": "asset-button",
+        "label": "+ Upload Custom Pattern SVGs",
+        "assetKind": "icons",
+        "showWhen": { "path": "canvas.mode", "equals": "pattern" }
+      },
+      {
+        "type": "text",
+        "label": "Watermark Text",
+        "path": "canvas.watermarkText",
+        "defaultValue": "CLUB 54",
+        "showWhen": { "path": "canvas.mode", "equals": "watermark" }
+      },
+      {
+        "type": "range",
+        "label": "Watermark Opacity",
+        "path": "canvas.watermarkOpacity",
+        "min": 0.02,
+        "max": 0.25,
+        "step": 0.01,
+        "percent": true,
+        "defaultValue": 0.05,
+        "showWhen": { "path": "canvas.mode", "equals": "watermark" }
+      },
+      {
+        "type": "color",
+        "label": "Watermark Color",
+        "path": "canvas.watermarkColor",
+        "defaultValue": "#141414",
+        "showWhen": { "path": "canvas.mode", "equals": "watermark" }
+      }
+    ]
+  },
+  {
+    "title": "Semi-Randomization (Court & Ace Flourishes)",
+    "defaultOpen": false,
+    "items": [
+      { "type": "seed", "label": "Global Seed", "path": "globalSeed", "defaultValue": 42 },
+      {
+        "type": "range",
+        "label": "Ornament Density",
+        "path": "deck.ornamentLevel",
+        "min": 0,
+        "max": 1.6,
+        "step": 0.2,
+        "unit": "×",
+        "defaultValue": 1
+      },
+      {
+        "type": "note",
+        "text": "Hover any Ace, Court, or Joker card and click Re-roll to cycle its seeded geometric flourishes."
+      }
+    ]
+  },
+  {
+    "title": "Typography",
+    "defaultOpen": false,
+    "items": [
+      {
+        "type": "select",
+        "label": "Corner Index Font",
+        "path": "typography.titleFont",
+        "preset": "fonts"
+      },
+      {
+        "type": "select",
+        "label": "Display / Subtitle Font",
+        "path": "typography.subtitleFont",
+        "preset": "fonts"
+      },
+      {
+        "type": "select",
+        "label": "Reference Body Font",
+        "path": "typography.bodyFont",
+        "preset": "fonts"
+      },
+      {
+        "type": "row",
+        "items": [
+          { "type": "number", "label": "Index Size (pt)", "path": "typography.titleSizePt", "min": 11, "max": 20, "step": 0.5, "defaultValue": 15 },
+          { "type": "number", "label": "Body Size (pt)", "path": "typography.bodySizePt", "min": 5.5, "max": 10, "step": 0.2, "defaultValue": 7.2 }
+        ]
+      }
+    ]
+  }
+]

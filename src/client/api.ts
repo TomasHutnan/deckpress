@@ -62,7 +62,7 @@ export const api = {
 
   createProject: (body: {
     name: string;
-    mode: 'blank' | 'template' | 'clone';
+    mode: 'blank' | 'template' | 'demo' | 'clone';
     repoUrl?: string;
     token?: string;
     saveToken?: boolean;
