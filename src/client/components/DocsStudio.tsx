@@ -9,11 +9,12 @@ import type {
   ProjectDoc,
   ProjectDocsMap,
 } from '../../shared/types';
-import { api } from '../api';
 
 interface DocsStudioProps {
   slug: string;
   docs: ProjectDocsMap;
+  activeDocId: string;
+  onActiveDocIdChange: (id: string) => void;
   cards: ExpandedCard[];
   cardSize: CardSize;
   variant: DesignVariant;
@@ -21,6 +22,7 @@ interface DocsStudioProps {
   overrides: CardOverrides;
   customCss: string;
   customFontFacesCss: string;
+  exportError?: string;
   onDocsChange: (next: ProjectDocsMap) => void;
 }
 
@@ -33,6 +35,8 @@ type EditorTarget =
 export function DocsStudio({
   slug,
   docs,
+  activeDocId,
+  onActiveDocIdChange,
   cards,
   cardSize,
   variant,
@@ -40,10 +44,18 @@ export function DocsStudio({
   overrides,
   customCss,
   customFontFacesCss,
+  exportError,
   onDocsChange,
 }: DocsStudioProps) {
-  const docIds = useMemo(() => Object.keys(docs).sort(), [docs]);
-  const [activeDocId, setActiveDocId] = useState<string>(() => docIds[0] || '');
+  const docIds = useMemo(
+    () =>
+      Object.keys(docs).sort((a, b) => {
+        const oa = docs[a].meta.order ?? 999;
+        const ob = docs[b].meta.order ?? 999;
+        return oa !== ob ? oa - ob : a.localeCompare(b);
+      }),
+    [docs],
+  );
   const effectiveDocId = docs[activeDocId] ? activeDocId : docIds[0] || '';
   const activeDoc: ProjectDoc | undefined = effectiveDocId ? docs[effectiveDocId] : undefined;
 
@@ -63,9 +75,7 @@ export function DocsStudio({
         ? { kind: 'section', name: sectionNames[0] }
         : { kind: 'styles' },
   );
-  const [zoom, setZoom] = useState(0.72);
-  const [exporting, setExporting] = useState(false);
-  const [exportError, setExportError] = useState('');
+  const [zoom, setZoom] = useState(() => activeDoc?.meta.defaultZoom ?? 0.75);
 
   const compiledTemplate = useMemo(
     () => compileTemplateFiles(templateFiles),
@@ -106,9 +116,10 @@ export function DocsStudio({
   };
 
   const selectDoc = (id: string) => {
-    setActiveDocId(id);
+    onActiveDocIdChange(id);
     const next = docs[id];
     if (!next) return;
+    setZoom(next.meta.defaultZoom ?? 0.75);
     if (next.renderJs !== undefined) {
       setTarget({ kind: 'renderJs' });
     } else {
@@ -161,31 +172,6 @@ export function DocsStudio({
       }
       return { ...d, stylesCss: val };
     });
-  };
-
-  const handleExportPdf = async () => {
-    if (!activeDoc) return;
-    setExporting(true);
-    setExportError('');
-    try {
-      const blob = await api.exportDocPdf(slug, {
-        docId: activeDoc.id,
-        title: activeDoc.meta.title || activeDoc.id,
-        bodyHtml: rendered.bodyHtml,
-        docCss: rendered.css,
-        cardBaseCss,
-      });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${slug}-${activeDoc.id}.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (err: unknown) {
-      setExportError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setExporting(false);
-    }
   };
 
   if (!activeDoc) {
@@ -314,20 +300,12 @@ export function DocsStudio({
               <input
                 type="range"
                 min={0.4}
-                max={1.15}
+                max={2.0}
                 step={0.05}
                 value={zoom}
                 onChange={(e) => setZoom(Number(e.target.value))}
               />
             </label>
-            <button
-              type="button"
-              className="btn btn-primary"
-              disabled={exporting || Boolean(rendered.error)}
-              onClick={handleExportPdf}
-            >
-              {exporting ? 'Exporting...' : 'Export Doc PDF'}
-            </button>
           </div>
         </div>
 

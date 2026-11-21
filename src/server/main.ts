@@ -330,6 +330,7 @@ app.post<{
     draftOverrides?: CardOverrides;
     draftCustomCss?: string;
     preRenderedCardsHtml?: string[];
+    preRenderedBacksHtml?: string[];
     preRenderedBaseCss?: string;
   };
 }>('/api/projects/:slug/export/pdf', async (req, reply) => {
@@ -345,8 +346,9 @@ app.post<{
       loaded.design.variants[variantKey] ||
       Object.values(loaded.design.variants)[0];
 
-    const filteredCards =
-      opts.filterType && opts.filterType !== 'all'
+    const filteredCards = Array.isArray(opts.filterTypes)
+      ? cardsRes.cards.filter((c) => opts.filterTypes!.includes(c.type_group))
+      : opts.filterType && opts.filterType !== 'all'
         ? cardsRes.cards.filter((c) => c.type_group === opts.filterType)
         : cardsRes.cards;
 
@@ -369,6 +371,7 @@ app.post<{
       customFontFacesCss: `${builtinFontsCss}\n${customFontFacesCss}`,
       customIconsSvg,
       preRenderedCardsHtml: req.body.preRenderedCardsHtml,
+      preRenderedBacksHtml: req.body.preRenderedBacksHtml,
       preRenderedBaseCss: req.body.preRenderedBaseCss,
       baseHref,
     });

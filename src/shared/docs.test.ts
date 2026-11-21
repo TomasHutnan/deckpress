@@ -157,3 +157,33 @@ test('renderProjectDocHtml executes programmatic render.js docs', () => {
   assert.equal(res.error, null);
   assert.ok(res.bodyHtml.includes('Total: 2'));
 });
+
+test('renderPrintDocumentHtml mirrors back sheets for duplex printing', async () => {
+  const { renderPrintDocumentHtml } = await import('./renderCard.js');
+  const design = createMenuTemplateDesign();
+  const variant = design.variants[design.activeVariant];
+  const html = renderPrintDocumentHtml({
+    cards: SAMPLE_CARDS.slice(0, 2),
+    variant,
+    overrides: {},
+    options: {
+      cardWidthMm: 63,
+      cardHeightMm: 88,
+      bleedMm: 2,
+      mode: 'sheet',
+      sides: 'duplex',
+      sheetFormat: 'a4',
+      gapMm: 2,
+      guidelines: 'crop-marks',
+    },
+    assetBaseUrl: '/assets',
+    preRenderedCardsHtml: ['<div class="f1">F1</div>', '<div class="f2">F2</div>'],
+    preRenderedBacksHtml: ['<div class="b1">B1</div>', '<div class="b2">B2</div>'],
+  });
+
+  // 1 front sheet + 1 mirrored back sheet
+  assert.equal((html.match(/class="dp-sheet"/g) || []).length, 2);
+  // Row of 3 cols: [B1, B2, empty] mirrored -> [empty, B2, B1]
+  assert.ok(html.indexOf('dp-empty-slot') < html.indexOf('class="b2"'));
+  assert.ok(html.indexOf('class="b2"') < html.indexOf('class="b1"'));
+});

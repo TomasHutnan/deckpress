@@ -6,6 +6,7 @@ import type {
   CutGuidelines,
   ExportMode,
   ExportOptions,
+  ExportSides,
   GitCommitInfo,
   GitStatusInfo,
   SheetFormat,
@@ -774,17 +775,28 @@ export function ExportModal({
   const [heightMm, setHeightMm] = useState(cardSize.heightMm);
   const [bleedMm, setBleedMm] = useState(cardSize.bleedMm);
   const [mode, setMode] = useState<ExportMode>('sheet');
+  const [sides, setSides] = useState<ExportSides>('duplex');
   const [sheetFormat, setSheetFormat] = useState<SheetFormat>('a4');
   const [sheetWidthMm, setSheetWidthMm] = useState(210);
   const [sheetHeightMm, setSheetHeightMm] = useState(297);
   const [gapMm, setGapMm] = useState(2);
   const [guidelines, setGuidelines] = useState<CutGuidelines>('crop-marks');
-  const [filterType, setFilterType] = useState('all');
+  const [selectedTypes, setSelectedTypes] = useState<string[]>(() => [...typeGroups]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
+  const toggleType = (t: string) => {
+    setSelectedTypes((prev) =>
+      prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t],
+    );
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (selectedTypes.length === 0) {
+      setError('Select at least one card type to export.');
+      return;
+    }
     setBusy(true);
     setError('');
     try {
@@ -793,12 +805,13 @@ export function ExportModal({
         cardHeightMm: heightMm,
         bleedMm,
         mode,
+        sides,
         sheetFormat,
         sheetWidthMm: sheetFormat === 'custom' ? sheetWidthMm : undefined,
         sheetHeightMm: sheetFormat === 'custom' ? sheetHeightMm : undefined,
         gapMm,
         guidelines,
-        filterType,
+        filterTypes: selectedTypes,
       });
       onClose();
     } catch (err: unknown) {
@@ -948,15 +961,75 @@ export function ExportModal({
         )}
 
         <div className="field">
-          <label>Cards to Include</label>
-          <select value={filterType} onChange={(e) => setFilterType(e.target.value)}>
-            <option value="all">All Cards</option>
-            {typeGroups.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
+          <label>Card Sides</label>
+          <div className="pill-group">
+            {(
+              [
+                ['front', 'Fronts Only'],
+                ['back', 'Backs Only'],
+                ['duplex', 'Fronts + Backs (Duplex)'],
+              ] as const
+            ).map(([val, label]) => (
+              <button
+                key={val}
+                type="button"
+                className={`pill ${sides === val ? 'active' : ''}`}
+                onClick={() => setSides(val)}
+              >
+                {label}
+              </button>
             ))}
-          </select>
+          </div>
+          {sides === 'duplex' && mode === 'sheet' && (
+            <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>
+              Back sheets are horizontally mirrored per row for exact long-edge duplex alignment.
+            </div>
+          )}
+        </div>
+
+        <div className="field">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <label>Cards to Include</label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                type="button"
+                className="btn-link"
+                onClick={() => setSelectedTypes([...typeGroups])}
+              >
+                All
+              </button>
+              <button
+                type="button"
+                className="btn-link"
+                onClick={() => setSelectedTypes([])}
+              >
+                None
+              </button>
+            </div>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 14px', marginTop: 4 }}>
+            {typeGroups.map((t) => (
+              <label
+                key={t}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  fontSize: 12.5,
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedTypes.includes(t)}
+                  onChange={() => toggleType(t)}
+                />
+                {t}
+              </label>
+            ))}
+          </div>
         </div>
 
         {error && <div style={{ color: '#dc2626', fontSize: 12 }}>{error}</div>}
@@ -965,7 +1038,11 @@ export function ExportModal({
           <button type="button" className="btn" onClick={onClose}>
             Cancel
           </button>
-          <button type="submit" className="btn btn-primary" disabled={busy}>
+          <button
+            type="submit"
+            className="btn btn-primary"
+            disabled={busy || selectedTypes.length === 0}
+          >
             {busy ? 'Rendering PDF...' : 'Download PDF'}
           </button>
         </div>

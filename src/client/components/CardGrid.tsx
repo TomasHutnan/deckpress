@@ -5,6 +5,7 @@ import type {
   CardSize,
   DesignVariant,
   ExpandedCard,
+  ProjectDocsMap,
 } from '../../shared/types';
 
 interface CardGridProps {
@@ -13,6 +14,7 @@ interface CardGridProps {
   cardSize: CardSize;
   variant: DesignVariant;
   templateFiles: Record<string, string>;
+  docs: ProjectDocsMap;
   overrides: CardOverrides;
   customCss: string;
   customFontFacesCss: string;
@@ -27,6 +29,7 @@ export function CardGrid({
   cardSize,
   variant,
   templateFiles,
+  docs,
   overrides,
   customCss,
   customFontFacesCss,
@@ -37,6 +40,12 @@ export function CardGrid({
   const [filterType, setFilterType] = useState<string>('all');
   const [search, setSearch] = useState('');
   const [zoom, setZoom] = useState(0.85);
+  const [showAllBacks, setShowAllBacks] = useState(false);
+  const [flippedKeys, setFlippedKeys] = useState<Record<string, boolean>>({});
+
+  const toggleFlipCard = (key: string) => {
+    setFlippedKeys((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
 
   const typeGroups = useMemo(() => {
     const set = new Set<string>();
@@ -119,6 +128,28 @@ export function CardGrid({
           ))}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div className="pill-group">
+            <button
+              type="button"
+              className={`pill ${!showAllBacks ? 'active' : ''}`}
+              onClick={() => {
+                setShowAllBacks(false);
+                setFlippedKeys({});
+              }}
+            >
+              Fronts
+            </button>
+            <button
+              type="button"
+              className={`pill ${showAllBacks ? 'active' : ''}`}
+              onClick={() => {
+                setShowAllBacks(true);
+                setFlippedKeys({});
+              }}
+            >
+              Backs
+            </button>
+          </div>
           <input
             type="text"
             placeholder="Search cards..."
@@ -144,16 +175,21 @@ export function CardGrid({
       <div className="canvas-scroll">
         <div className="card-grid">
           {visibleCards.map((card, idx) => {
+            const isBack = showAllBacks !== Boolean(flippedKeys[card._instanceKey]);
             let html = '';
             try {
-              html = compiled.renderer.renderCard({
+              const renderCtx = {
                 card,
                 variant,
                 overrides,
                 assetBaseUrl,
                 cardIndex: idx,
                 cardSize: previewCardSize,
-              });
+                docs,
+              };
+              html = isBack
+                ? compiled.renderer.renderCardBack(renderCtx)
+                : compiled.renderer.renderCard(renderCtx);
             } catch (err: unknown) {
               const msg = err instanceof Error ? err.message : String(err);
               html = `<div style="padding:12px;color:#dc2626;font-size:12px">Render error: ${msg}</div>`;
@@ -172,9 +208,18 @@ export function CardGrid({
                   <span title={card._instanceKey}>
                     {card.id}
                     {card._totalCopies > 1 ? ` #${card._copyIndex}` : ''}
+                    {isBack ? ' [B]' : ''}
                     {hasOverride ? ' •' : ''}
                   </span>
                   <div className="card-tile-actions">
+                    <button
+                      type="button"
+                      className={`btn btn-xs ${isBack ? 'btn-dark' : ''}`}
+                      title="Flip this card (Front / Back)"
+                      onClick={() => toggleFlipCard(card._instanceKey)}
+                    >
+                      ⇄
+                    </button>
                     <button
                       type="button"
                       className="btn btn-xs"

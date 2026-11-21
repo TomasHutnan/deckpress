@@ -7,6 +7,7 @@ import type {
   CardSize,
   DesignVariant,
   ExpandedCard,
+  ProjectDocsMap,
 } from './types.js';
 import { getCardWatermarks, getSheetWatermarks, watermarksOverlap } from './watermark.js';
 
@@ -18,10 +19,12 @@ export interface RenderCardContext {
   customIconsSvg?: string[];
   cardIndex: number;
   cardSize: CardSize;
+  docs?: ProjectDocsMap;
 }
 
 export interface ProjectRenderer {
   renderCard: (ctx: RenderCardContext) => string;
+  renderCardBack: (ctx: RenderCardContext) => string;
   getBaseCss: (cardSize: CardSize, customCss: string) => string;
 }
 
@@ -72,6 +75,18 @@ function normalizeModuleName(name: string): string {
   return clean.endsWith('.js') ? clean : `${clean}.js`;
 }
 
+function defaultRenderCardBack(ctx: RenderCardContext): string {
+  const { card, variant, cardSize } = ctx;
+  const label = escapeHtml((variant.gameMark?.text || 'MENU').toUpperCase());
+  return `
+    <div class="dp-card" data-card-id="${escapeHtml(card._instanceKey)}" style="--tm-w:${cardSize.widthMm}mm;--tm-h:${cardSize.heightMm}mm;--tm-bleed:${cardSize.bleedMm}mm;--dp-bg:${variant.backgroundColor};--dp-fg:${variant.textColor};">
+      <div class="dp-trim-area" style="display:flex;align-items:center;justify-content:center;background:${variant.backgroundColor};color:${variant.textColor};">
+        <div style="font-family:${variant.typography.titleFont};font-size:22pt;font-weight:900;letter-spacing:0.08em;opacity:0.18">${label}</div>
+      </div>
+    </div>
+  `;
+}
+
 /**
  * Compiles a project's `template/` folder (multiple .js and .css files) in the browser.
  * Entry point is `index.js` (or legacy `renderer.js`). Sibling `.js` files can be loaded
@@ -83,6 +98,7 @@ export function compileTemplateFiles(files: Record<string, string> | undefined):
 } {
   const fallback: ProjectRenderer = {
     renderCard: DECKPRESS_HELPERS.defaultRenderCard,
+    renderCardBack: defaultRenderCardBack,
     getBaseCss: DECKPRESS_HELPERS.defaultGetBaseCss,
   };
 
@@ -107,6 +123,7 @@ export function compileTemplateFiles(files: Record<string, string> | undefined):
     return {
       renderer: {
         renderCard: fallback.renderCard,
+        renderCardBack: fallback.renderCardBack,
         getBaseCss: (cardSize, customCss) =>
           `${fallback.getBaseCss(cardSize, '')}\n${templateCss}\n${customCss}`,
       },
@@ -154,6 +171,10 @@ export function compileTemplateFiles(files: Record<string, string> | undefined):
     return {
       renderer: {
         renderCard: (ctx) => String(mod.renderCard!(ctx)),
+        renderCardBack: (ctx) =>
+          typeof mod.renderCardBack === 'function'
+            ? String(mod.renderCardBack(ctx))
+            : defaultRenderCardBack(ctx),
         getBaseCss: (cardSize, customCss) => {
           const base =
             typeof mod.getBaseCss === 'function'

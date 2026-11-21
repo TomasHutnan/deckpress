@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type { ControlsSchema } from '../shared/controls';
+import { renderProjectDocHtml } from '../shared/docs';
 import { compileTemplateFiles } from '../shared/runtime';
 import type {
   CardOverrides,
@@ -37,6 +38,9 @@ export function App() {
   const [draftCustomCss, setDraftCustomCss] = useState<string>('');
 
   const [activeView, setActiveView] = useState<'cards' | 'docs'>('cards');
+  const [activeDocId, setActiveDocId] = useState<string>('');
+  const [exportingDoc, setExportingDoc] = useState(false);
+  const [docExportError, setDocExportError] = useState('');
 
   const [cards, setCards] = useState<ExpandedCard[]>([]);
   const [cardsWarning, setCardsWarning] = useState<string>('');
@@ -166,7 +170,7 @@ export function App() {
     return savedProject.assets.fonts
       .map((file) => {
         const family = file.replace(/\.[^.]+$/, '').replace(/'/g, '');
-        return `@font-face { font-family: '${family}'; src: url('${base}/${encodeURIComponent(file)}'); font-display: swap; }`;
+        return `@font-face { font-family: '${family}'; font-weight: 100 900; src: url('${base}/${encodeURIComponent(file)}'); font-display: swap; }`;
       })
       .join('\n');
   }, [savedProject, activeSlug]);
@@ -181,8 +185,9 @@ export function App() {
     if (compiled.error) {
       throw new Error(`Fix template error before exporting: ${compiled.error}`);
     }
-    const filteredCards =
-      options.filterType && options.filterType !== 'all'
+    const filteredCards = Array.isArray(options.filterTypes)
+      ? cards.filter((c) => options.filterTypes!.includes(c.type_group))
+      : options.filterType && options.filterType !== 'all'
         ? cards.filter((c) => c.type_group === options.filterType)
         : cards;
     const exportCardSize = {
@@ -191,6 +196,7 @@ export function App() {
       bleedMm: options.bleedMm,
     };
     const assetBaseUrl = `/api/projects/${encodeURIComponent(activeSlug)}/assets`;
+    const sides = options.sides || 'front';
     const preRenderedCardsHtml = filteredCards.map((card, idx) =>
       compiled.renderer.renderCard({
         card,
@@ -199,8 +205,23 @@ export function App() {
         assetBaseUrl,
         cardIndex: idx,
         cardSize: exportCardSize,
+        docs: draftDocs,
       }),
     );
+    const preRenderedBacksHtml =
+      sides === 'back' || sides === 'duplex'
+        ? filteredCards.map((card, idx) =>
+            compiled.renderer.renderCardBack({
+              card,
+              variant: activeVariant,
+              overrides: draftOverrides,
+              assetBaseUrl,
+              cardIndex: idx,
+              cardSize: exportCardSize,
+              docs: draftDocs,
+            }),
+          )
+        : undefined;
     const preRenderedBaseCss = compiled.renderer.getBaseCss(
       exportCardSize,
       draftCustomCss,
@@ -212,14 +233,66 @@ export function App() {
       draftOverrides,
       draftCustomCss,
       preRenderedCardsHtml,
+      preRenderedBacksHtml,
       preRenderedBaseCss,
     });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${activeSlug}-${options.mode}.pdf`;
+    a.download = `${activeSlug}-${options.mode}-${sides}.pdf`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const handleExportActiveDoc = async () => {
+    if (!activeSlug || !activeVariant || !draftConfig) return;
+    const docIds = Object.keys(draftDocs).sort();
+    const docId = draftDocs[activeDocId] ? activeDocId : docIds[0];
+    const activeDoc = docId ? draftDocs[docId] : undefined;
+    if (!activeDoc) return;
+
+    setExportingDoc(true);
+    setDocExportError('');
+    try {
+      const compiled = compileTemplateFiles(draftTemplateFiles);
+      if (compiled.error) {
+        throw new Error(`Fix template error before exporting: ${compiled.error}`);
+      }
+      const zeroBleedSize = {
+        widthMm: draftConfig.cardSize.widthMm,
+        heightMm: draftConfig.cardSize.heightMm,
+        bleedMm: 0,
+      };
+      const assetBaseUrl = `/api/projects/${encodeURIComponent(activeSlug)}/assets`;
+      const rendered = renderProjectDocHtml({
+        doc: activeDoc,
+        cards,
+        variant: activeVariant,
+        cardSize: zeroBleedSize,
+        overrides: draftOverrides,
+        renderer: compiled.renderer,
+        assetBaseUrl,
+      });
+      if (rendered.error) throw new Error(rendered.error);
+      const cardBaseCss = compiled.renderer.getBaseCss(zeroBleedSize, draftCustomCss);
+      const blob = await api.exportDocPdf(activeSlug, {
+        docId: activeDoc.id,
+        title: activeDoc.meta.title || activeDoc.id,
+        bodyHtml: rendered.bodyHtml,
+        docCss: rendered.css,
+        cardBaseCss,
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${activeSlug}-${activeDoc.id}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err: unknown) {
+      setDocExportError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setExportingDoc(false);
+    }
   };
 
   return (
@@ -307,9 +380,16 @@ export function App() {
               <button
                 type="button"
                 className="btn btn-primary"
-                onClick={() => setModal('export')}
+                disabled={activeView === 'docs' && (exportingDoc || Object.keys(draftDocs).length === 0)}
+                onClick={() => {
+                  if (activeView === 'docs') {
+                    handleExportActiveDoc();
+                  } else {
+                    setModal('export');
+                  }
+                }}
               >
-                Export PDF
+                {activeView === 'docs' && exportingDoc ? 'Exporting...' : 'Export PDF'}
               </button>
             </>
           )}
@@ -323,6 +403,8 @@ export function App() {
           <DocsStudio
             slug={activeSlug}
             docs={draftDocs}
+            activeDocId={activeDocId}
+            onActiveDocIdChange={setActiveDocId}
             cards={cards}
             cardSize={draftConfig.cardSize}
             variant={activeVariant}
@@ -330,6 +412,7 @@ export function App() {
             overrides={draftOverrides}
             customCss={draftCustomCss}
             customFontFacesCss={customFontFacesCss}
+            exportError={docExportError}
             onDocsChange={setDraftDocs}
           />
         ) : (
@@ -354,6 +437,7 @@ export function App() {
             cardSize={draftConfig.cardSize}
             variant={activeVariant}
             templateFiles={draftTemplateFiles}
+            docs={draftDocs}
             overrides={draftOverrides}
             customCss={draftCustomCss}
             customFontFacesCss={customFontFacesCss}

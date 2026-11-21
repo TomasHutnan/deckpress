@@ -159,6 +159,7 @@ export interface ComputedCardLayout {
 }
 
 export type ExportMode = 'individual' | 'sheet';
+export type ExportSides = 'front' | 'back' | 'duplex';
 export type SheetFormat = 'a4' | 'a3' | 'letter' | 'custom';
 export type CutGuidelines = 'none' | 'crop-marks' | 'cut-grid';
 
@@ -167,6 +168,7 @@ export interface ExportOptions {
   cardHeightMm: number;
   bleedMm: number;
   mode: ExportMode;
+  sides?: ExportSides;
   sheetFormat: SheetFormat;
   sheetWidthMm?: number;
   sheetHeightMm?: number;
@@ -174,6 +176,7 @@ export interface ExportOptions {
   guidelines: CutGuidelines;
   variantKey?: string;
   filterType?: string;
+  filterTypes?: string[];
 }
 
 export interface GitCommitInfo {
@@ -202,6 +205,8 @@ export type DocOrientation = 'portrait' | 'landscape';
 
 export interface ProjectDocMeta {
   title: string;
+  order?: number;
+  defaultZoom?: number;
   pageSize?: DocPageSize;
   orientation?: DocOrientation;
   columns?: number;

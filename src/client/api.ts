@@ -172,6 +172,7 @@ export const api = {
       draftOverrides?: CardOverrides;
       draftCustomCss?: string;
       preRenderedCardsHtml?: string[];
+      preRenderedBacksHtml?: string[];
       preRenderedBaseCss?: string;
     },
   ): Promise<Blob> => {

@@ -576,7 +576,7 @@ export async function buildInlineCustomFontFacesCss(slug: string): Promise<strin
     try {
       const buf = await fs.readFile(path.join(dir, 'assets', 'fonts', file));
       rules.push(
-        `@font-face { font-family: '${family}'; src: url('data:${mime};base64,${buf.toString('base64')}') format('${format}'); font-display: block; }`,
+        `@font-face { font-family: '${family}'; font-weight: 100 900; src: url('data:${mime};base64,${buf.toString('base64')}') format('${format}'); font-display: block; }`,
       );
     } catch {
       // Ignore unreadable font file

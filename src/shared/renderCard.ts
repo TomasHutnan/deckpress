@@ -599,6 +599,7 @@ export function renderPrintDocumentHtml(params: {
   customFontFacesCss?: string;
   customIconsSvg?: string[];
   preRenderedCardsHtml?: string[];
+  preRenderedBacksHtml?: string[];
   preRenderedBaseCss?: string;
   baseHref?: string;
 }): string {
@@ -612,9 +613,11 @@ export function renderPrintDocumentHtml(params: {
     customFontFacesCss = '',
     customIconsSvg,
     preRenderedCardsHtml,
+    preRenderedBacksHtml,
     preRenderedBaseCss,
     baseHref,
   } = params;
+  const sides = options.sides || 'front';
   const cardSize: CardSize = {
     widthMm: options.cardWidthMm,
     heightMm: options.cardHeightMm,
@@ -623,7 +626,7 @@ export function renderPrintDocumentHtml(params: {
   const cardFullW = cardSize.widthMm + cardSize.bleedMm * 2;
   const cardFullH = cardSize.heightMm + cardSize.bleedMm * 2;
 
-  const renderedCards =
+  const renderedFronts =
     preRenderedCardsHtml && preRenderedCardsHtml.length > 0
       ? preRenderedCardsHtml
       : cards.map(
@@ -638,6 +641,11 @@ export function renderPrintDocumentHtml(params: {
               cardSize,
             ).html,
         );
+
+  const renderedBacks =
+    preRenderedBacksHtml && preRenderedBacksHtml.length > 0
+      ? preRenderedBacksHtml
+      : renderedFronts;
 
   let bodyHtml = '';
   let pageCss = '';
@@ -655,9 +663,22 @@ export function renderPrintDocumentHtml(params: {
       }
       .dp-page-individual:last-child { page-break-after: auto; break-after: auto; }
     `;
-    bodyHtml = renderedCards
-      .map((html) => `<div class="dp-page-individual">${html}</div>`)
-      .join('\n');
+    const pages: string[] = [];
+    if (sides === 'back') {
+      for (const html of renderedBacks) {
+        pages.push(`<div class="dp-page-individual">${html}</div>`);
+      }
+    } else if (sides === 'duplex') {
+      for (let i = 0; i < renderedFronts.length; i++) {
+        pages.push(`<div class="dp-page-individual">${renderedFronts[i]}</div>`);
+        pages.push(`<div class="dp-page-individual">${renderedBacks[i] ?? ''}</div>`);
+      }
+    } else {
+      for (const html of renderedFronts) {
+        pages.push(`<div class="dp-page-individual">${html}</div>`);
+      }
+    }
+    bodyHtml = pages.join('\n');
   } else {
     const { widthMm: sheetW, heightMm: sheetH } = getSheetDimensionsMm(options);
     const gapMm = Math.max(0, options.gapMm);
@@ -691,6 +712,10 @@ export function renderPrintDocumentHtml(params: {
         grid-template-rows: repeat(${rows}, ${cardFullH}mm);
         gap: ${gapMm}mm;
       }
+      .dp-empty-slot {
+        width: ${cardFullW}mm;
+        height: ${cardFullH}mm;
+      }
       .dp-guidelines {
         position: absolute;
         inset: 0;
@@ -708,25 +733,54 @@ export function renderPrintDocumentHtml(params: {
       }
     `;
 
+    const mirrorRowsForDuplex = (slice: string[]): string[] => {
+      const padded = [...slice];
+      while (padded.length < perPage) padded.push('<div class="dp-empty-slot"></div>');
+      const mirrored: string[] = [];
+      for (let r = 0; r < rows; r++) {
+        const rowCells = padded.slice(r * cols, (r + 1) * cols).reverse();
+        mirrored.push(...rowCells);
+      }
+      return mirrored;
+    };
+
+    const guideSvg = renderGuidelinesSvg(
+      sheetW,
+      sheetH,
+      cols,
+      rows,
+      cardFullW,
+      cardFullH,
+      cardSize.bleedMm,
+      gapMm,
+      originX,
+      originY,
+      options.guidelines,
+    );
+
     const pages: string[] = [];
-    for (let i = 0; i < renderedCards.length; i += perPage) {
-      const slice = renderedCards.slice(i, i + perPage);
-      const guideSvg = renderGuidelinesSvg(
-        sheetW,
-        sheetH,
-        cols,
-        rows,
-        cardFullW,
-        cardFullH,
-        cardSize.bleedMm,
-        gapMm,
-        originX,
-        originY,
-        options.guidelines,
-      );
-      pages.push(
-        `<div class="dp-sheet"><div class="dp-sheet-grid">${slice.join('')}</div>${guideSvg}</div>`,
-      );
+    const totalCount = sides === 'back' ? renderedBacks.length : renderedFronts.length;
+    for (let i = 0; i < totalCount; i += perPage) {
+      if (sides === 'back') {
+        const backSlice = renderedBacks.slice(i, i + perPage);
+        pages.push(
+          `<div class="dp-sheet"><div class="dp-sheet-grid">${backSlice.join('')}</div>${guideSvg}</div>`,
+        );
+      } else if (sides === 'duplex') {
+        const frontSlice = renderedFronts.slice(i, i + perPage);
+        const backSlice = mirrorRowsForDuplex(renderedBacks.slice(i, i + perPage));
+        pages.push(
+          `<div class="dp-sheet"><div class="dp-sheet-grid">${frontSlice.join('')}</div>${guideSvg}</div>`,
+        );
+        pages.push(
+          `<div class="dp-sheet"><div class="dp-sheet-grid">${backSlice.join('')}</div>${guideSvg}</div>`,
+        );
+      } else {
+        const frontSlice = renderedFronts.slice(i, i + perPage);
+        pages.push(
+          `<div class="dp-sheet"><div class="dp-sheet-grid">${frontSlice.join('')}</div>${guideSvg}</div>`,
+        );
+      }
     }
     bodyHtml = pages.join('\n');
   }
