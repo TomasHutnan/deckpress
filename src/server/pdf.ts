@@ -24,6 +24,7 @@ let exportQueue: Promise<unknown> = Promise.resolve();
 export function renderHtmlToPdf(
   html: string,
   authHeader?: string,
+  allowedAuthOrigin?: string,
 ): Promise<Buffer> {
   const job = exportQueue.then(async () => {
     const executablePath = findChromiumExecutable();
@@ -50,9 +51,36 @@ export function renderHtmlToPdf(
     });
     try {
       const page = await browser.newPage();
-      if (authHeader) {
-        await page.setExtraHTTPHeaders({ authorization: authHeader });
-      }
+      const safeOrigin = allowedAuthOrigin ? new URL(allowedAuthOrigin).origin : null;
+
+      // Intercept requests so:
+      // 1) file:// local filesystem reads are always blocked
+      // 2) DeckPress Basic Auth is ONLY sent to local loopback (never leaked to external URLs)
+      await page.setRequestInterception(true);
+      page.on('request', (req) => {
+        const url = req.url();
+        if (url.startsWith('file:')) {
+          void req.abort('blockedbyclient');
+          return;
+        }
+        if (authHeader && safeOrigin && (url.startsWith('http://') || url.startsWith('https://'))) {
+          try {
+            if (new URL(url).origin === safeOrigin) {
+              void req.continue({
+                headers: {
+                  ...req.headers(),
+                  authorization: authHeader,
+                },
+              });
+              return;
+            }
+          } catch {
+            // Fall through to normal continue without auth header
+          }
+        }
+        void req.continue();
+      });
+
       await page.setContent(html, { waitUntil: 'load', timeout: 30_000 });
       await page.evaluate(async () => {
         await document.fonts.ready;

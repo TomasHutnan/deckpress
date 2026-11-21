@@ -124,14 +124,42 @@ export async function initProjectRepo(dir: string, initialMessage: string): Prom
   }
 }
 
+export function validateGitRemoteUrl(rawUrl: string): string {
+  const clean = rawUrl.trim();
+  if (!clean) throw new Error('Remote URL is required');
+  if (clean.startsWith('-')) {
+    throw new Error('Invalid remote URL');
+  }
+  let parsed: URL;
+  try {
+    parsed = new URL(clean);
+  } catch {
+    throw new Error('Remote URL must be a valid https:// Git URL');
+  }
+  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+    throw new Error('Only HTTPS/HTTP remote URLs are supported');
+  }
+  if (parsed.username || parsed.password) {
+    throw new Error(
+      'Do not embed credentials in the remote URL; pass a token only during Pull/Push.',
+    );
+  }
+  const host = parsed.hostname.toLowerCase();
+  if (!host || host === 'localhost' || host === '127.0.0.1' || host === '::1') {
+    throw new Error('Remote URL cannot target localhost');
+  }
+  return clean;
+}
+
 export async function cloneProjectRepo(
   repoUrl: string,
   targetDir: string,
   token?: string,
 ): Promise<void> {
+  const safeUrl = validateGitRemoteUrl(repoUrl);
   const parent = path.dirname(targetDir);
   await fs.mkdir(parent, { recursive: true });
-  await runGit(parent, ['clone', '--depth', '50', repoUrl, targetDir], token);
+  await runGit(parent, ['clone', '--depth', '50', '--', safeUrl, targetDir], token);
   await runGit(targetDir, ['config', 'user.name', 'DeckPress']);
   await runGit(targetDir, ['config', 'user.email', 'deckpress@local']);
 }
@@ -208,12 +236,7 @@ export async function rollbackToCommit(dir: string, hash: string): Promise<void>
 }
 
 export async function connectRemote(dir: string, remoteUrl: string): Promise<void> {
-  const clean = remoteUrl.trim();
-  if (!clean) throw new Error('Remote URL is required');
-  // Reject URLs embedding inline credentials
-  if (/^https?:\/\/[^/]+@/.test(clean)) {
-    throw new Error('Do not embed credentials in the remote URL; pass a token only during Pull/Push.');
-  }
+  const clean = validateGitRemoteUrl(remoteUrl);
   try {
     await runGit(dir, ['remote', 'get-url', 'origin']);
     await runGit(dir, ['remote', 'set-url', 'origin', clean]);

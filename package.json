@@ -8,7 +8,7 @@
     "dev:client": "vite",
     "build": "vite build && tsc -p tsconfig.server.json",
     "start": "node dist/server/server/main.js",
-    "test": "tsx --test src/shared/*.test.ts",
+    "test": "tsx --test src/shared/*.test.ts src/server/*.test.ts",
     "typecheck": "tsc --noEmit",
     "hash-password": "node scripts/hash-password.mjs"
   },

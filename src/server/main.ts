@@ -14,7 +14,7 @@ import type {
   ProjectConfig,
   ProjectDocsMap,
 } from '../shared/types.js';
-import { createBasicAuthVerifier } from './auth.js';
+import { createAuthRateLimiter, createBasicAuthVerifier } from './auth.js';
 import { getBuiltinFontsCss } from './fonts.js';
 import {
   clearProjectGitToken,
@@ -36,6 +36,7 @@ import {
   listProjects,
   loadCustomIconsSvg,
   loadProject,
+  resolveProjectCsvPath,
   resolveProjectDir,
   sanitizeFilename,
   saveAsset,
@@ -50,7 +51,7 @@ const STATIC_DIR = process.env.DECKPRESS_STATIC_DIR || path.resolve(process.cwd(
 const AUTH_USER = (process.env.DECKPRESS_USER || '').trim();
 const AUTH_PASSWORD_HASH = (process.env.DECKPRESS_PASSWORD_HASH || '').trim();
 
-const app = Fastify({ logger: true });
+const app = Fastify({ logger: true, trustProxy: true });
 
 await app.register(multipart, {
   limits: {
@@ -61,9 +62,26 @@ await app.register(multipart, {
 // Optional Basic Auth using scrypt password hash (skips /healthz)
 if (AUTH_PASSWORD_HASH) {
   const verifyBasicAuth = createBasicAuthVerifier(AUTH_USER, AUTH_PASSWORD_HASH);
+  const authRateLimiter = createAuthRateLimiter();
   app.addHook('onRequest', async (req, reply) => {
     if (req.url === '/healthz') return;
-    if (await verifyBasicAuth(req.headers.authorization)) return;
+
+    const ip = req.ip || 'unknown';
+    const limit = authRateLimiter.check(ip);
+    if (!limit.allowed) {
+      reply.header('Retry-After', String(limit.retryAfterSec));
+      return reply.code(429).send({ error: 'Too many failed authentication attempts' });
+    }
+
+    const authHeader = req.headers.authorization;
+    if (await verifyBasicAuth(authHeader)) {
+      authRateLimiter.recordSuccess(ip);
+      return;
+    }
+
+    if (authHeader) {
+      authRateLimiter.recordFailure(ip);
+    }
     reply.header('WWW-Authenticate', 'Basic realm="DeckPress"');
     return reply.code(401).send({ error: 'Authentication required' });
   });
@@ -168,9 +186,8 @@ app.post<{ Params: { slug: string } }>('/api/projects/:slug/cards/upload', async
     const file = await req.file();
     if (!file) return reply.code(400).send({ error: 'CSV file required' });
     const buf = await file.toBuffer();
-    const dir = resolveProjectDir(req.params.slug);
     const loaded = await loadProject(req.params.slug);
-    await fs.writeFile(path.join(dir, loaded.config.localCsv || 'cards.csv'), buf);
+    await fs.writeFile(resolveProjectCsvPath(req.params.slug, loaded.config.localCsv), buf);
     return await fetchProjectCards(req.params.slug, loaded.config, true);
   } catch (err: unknown) {
     return reply.code(400).send({ error: err instanceof Error ? err.message : String(err) });
@@ -377,7 +394,7 @@ app.post<{
       baseHref,
     });
 
-    const pdfBuffer = await renderHtmlToPdf(html, req.headers.authorization);
+    const pdfBuffer = await renderHtmlToPdf(html, req.headers.authorization, baseHref);
     reply
       .header('Content-Type', 'application/pdf')
       .header(
@@ -420,7 +437,7 @@ app.post<{
       baseHref,
     });
 
-    const pdfBuffer = await renderHtmlToPdf(html, req.headers.authorization);
+    const pdfBuffer = await renderHtmlToPdf(html, req.headers.authorization, baseHref);
     const safeDocId = (docId || 'doc').replace(/[^a-zA-Z0-9_-]/g, '');
     reply
       .header('Content-Type', 'application/pdf')

@@ -64,6 +64,28 @@ export function resolveProjectDir(slug: string): string {
   return dir;
 }
 
+export function sanitizeCsvFilename(input?: string): string {
+  const clean = (input || 'cards.csv').trim();
+  if (!clean) return 'cards.csv';
+  if (clean.includes('/') || clean.includes('\\') || clean.includes('..')) {
+    throw new Error('CSV filename must be a plain filename inside the project directory');
+  }
+  if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]*\.csv$/i.test(clean)) {
+    throw new Error('CSV filename must end in .csv and contain only safe characters');
+  }
+  return clean;
+}
+
+export function resolveProjectCsvPath(slug: string, localCsv?: string): string {
+  const dir = resolveProjectDir(slug);
+  const safeCsv = sanitizeCsvFilename(localCsv);
+  const resolved = path.resolve(dir, safeCsv);
+  if (!resolved.startsWith(dir + path.sep)) {
+    throw new Error('Invalid CSV path');
+  }
+  return resolved;
+}
+
 async function readJsonOrDefault<T>(filePath: string, fallback: T): Promise<T> {
   try {
     const raw = await fs.readFile(filePath, 'utf8');
@@ -437,7 +459,7 @@ export async function saveProjectConfig(
   const safeConfig: ProjectConfig = {
     ...config,
     slug,
-    localCsv: config.localCsv || 'cards.csv',
+    localCsv: sanitizeCsvFilename(config.localCsv),
   };
   await fs.writeFile(
     path.join(dir, 'project.json'),
@@ -469,7 +491,7 @@ export async function saveProjectDesign(
     const safeConfig: ProjectConfig = {
       ...payload.config,
       slug,
-      localCsv: payload.config.localCsv || 'cards.csv',
+      localCsv: sanitizeCsvFilename(payload.config.localCsv),
     };
     await fs.writeFile(
       path.join(dir, 'project.json'),
@@ -505,7 +527,7 @@ export async function saveProjectDesign(
         createStarterProjectConfig(slug, slug),
       ));
     await fs.writeFile(
-      path.join(dir, cfg.localCsv || 'cards.csv'),
+      resolveProjectCsvPath(slug, cfg.localCsv),
       payload.cardsCsv,
       'utf8',
     );
