@@ -547,14 +547,19 @@ ${buildDocPaletteVarsCss(variant)}
 }
 
 .dp-doc-pill {
-  display: inline-block;
-  padding: 0.3mm 1.4mm;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 7.5mm;
+  padding: 0.3mm 1.2mm;
   border-radius: 0.8mm;
   color: #FFFFFF;
   font-size: 7pt;
   font-weight: 800;
-  line-height: 1.2;
-  vertical-align: baseline;
+  line-height: 1.15;
+  text-align: center;
+  vertical-align: middle;
+  box-sizing: border-box;
 }
 
 .dp-doc-card-row {
