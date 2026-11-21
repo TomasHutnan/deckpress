@@ -17,6 +17,9 @@ import type {
   DesignConfig,
   GitStatusInfo,
   ProjectConfig,
+  ProjectDoc,
+  ProjectDocMeta,
+  ProjectDocsMap,
 } from '../shared/types.js';
 import {
   cloneProjectRepo,
@@ -111,6 +114,7 @@ export interface LoadedProject {
   design: DesignConfig;
   controls: ControlsSchema;
   templateFiles: Record<string, string>;
+  docs: ProjectDocsMap;
   overrides: CardOverrides;
   customCss: string;
   git: GitStatusInfo;
@@ -119,6 +123,129 @@ export interface LoadedProject {
 
 function isValidTemplateFilename(name: string): boolean {
   return /^[a-zA-Z0-9][a-zA-Z0-9._-]*\.(js|css)$/.test(name);
+}
+
+function isValidDocId(name: string): boolean {
+  return /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(name);
+}
+
+function isValidDocFile(name: string, ext: 'md' | 'html'): boolean {
+  return new RegExp(`^[a-zA-Z0-9][a-zA-Z0-9._-]*\\.${ext}$`).test(name);
+}
+
+async function readProjectDocs(dir: string): Promise<ProjectDocsMap> {
+  const docsRoot = path.join(dir, 'docs');
+  const result: ProjectDocsMap = {};
+  let entries;
+  try {
+    entries = await fs.readdir(docsRoot, { withFileTypes: true });
+  } catch {
+    return result;
+  }
+
+  for (const entry of entries) {
+    if (!entry.isDirectory() || !isValidDocId(entry.name)) continue;
+    const docDir = path.join(docsRoot, entry.name);
+    const meta = await readJsonOrDefault<ProjectDocMeta>(path.join(docDir, 'doc.json'), {
+      title: entry.name,
+      pageSize: 'A4',
+      orientation: 'portrait',
+      columns: 1,
+      marginMm: 9.5,
+    });
+    const stylesCss = await readTextOrDefault(path.join(docDir, 'styles.css'), '');
+    const renderJsRaw = await readTextOrDefault(path.join(docDir, 'render.js'), '');
+
+    const sections: Record<string, string> = {};
+    const secEntries = await fs
+      .readdir(path.join(docDir, 'sections'), { withFileTypes: true })
+      .catch(() => []);
+    for (const se of secEntries) {
+      if (!se.isFile() || !isValidDocFile(se.name, 'md')) continue;
+      sections[se.name] = await fs.readFile(path.join(docDir, 'sections', se.name), 'utf8');
+    }
+
+    const diagrams: Record<string, string> = {};
+    const diagEntries = await fs
+      .readdir(path.join(docDir, 'diagrams'), { withFileTypes: true })
+      .catch(() => []);
+    for (const de of diagEntries) {
+      if (!de.isFile() || !isValidDocFile(de.name, 'html')) continue;
+      diagrams[de.name] = await fs.readFile(path.join(docDir, 'diagrams', de.name), 'utf8');
+    }
+
+    const doc: ProjectDoc = {
+      id: entry.name,
+      meta,
+      stylesCss,
+      sections,
+      diagrams,
+      ...(renderJsRaw ? { renderJs: renderJsRaw } : {}),
+    };
+    result[entry.name] = doc;
+  }
+
+  return result;
+}
+
+async function writeProjectDocs(dir: string, docs: ProjectDocsMap): Promise<void> {
+  const docsRoot = path.join(dir, 'docs');
+  await fs.mkdir(docsRoot, { recursive: true });
+
+  for (const [docId, doc] of Object.entries(docs)) {
+    if (!isValidDocId(docId)) {
+      throw new Error(`Invalid doc id: ${docId}`);
+    }
+    const docDir = path.join(docsRoot, docId);
+    await fs.mkdir(docDir, { recursive: true });
+    await fs.writeFile(
+      path.join(docDir, 'doc.json'),
+      JSON.stringify(doc.meta, null, 2) + '\n',
+      'utf8',
+    );
+    await fs.writeFile(path.join(docDir, 'styles.css'), doc.stylesCss || '', 'utf8');
+    if (doc.renderJs !== undefined) {
+      await fs.writeFile(path.join(docDir, 'render.js'), doc.renderJs, 'utf8');
+    }
+
+    const secDir = path.join(docDir, 'sections');
+    if (Object.keys(doc.sections || {}).length > 0) {
+      await fs.mkdir(secDir, { recursive: true });
+      const keepSec = new Set<string>();
+      for (const [name, content] of Object.entries(doc.sections)) {
+        if (!isValidDocFile(name, 'md')) {
+          throw new Error(`Invalid section filename: ${name}`);
+        }
+        keepSec.add(name);
+        await fs.writeFile(path.join(secDir, name), content, 'utf8');
+      }
+      const existingSec = await fs.readdir(secDir).catch(() => []);
+      for (const file of existingSec) {
+        if (isValidDocFile(file, 'md') && !keepSec.has(file)) {
+          await fs.unlink(path.join(secDir, file)).catch(() => {});
+        }
+      }
+    }
+
+    const diagDir = path.join(docDir, 'diagrams');
+    if (Object.keys(doc.diagrams || {}).length > 0) {
+      await fs.mkdir(diagDir, { recursive: true });
+      const keepDiag = new Set<string>();
+      for (const [name, content] of Object.entries(doc.diagrams)) {
+        if (!isValidDocFile(name, 'html')) {
+          throw new Error(`Invalid diagram filename: ${name}`);
+        }
+        keepDiag.add(name);
+        await fs.writeFile(path.join(diagDir, name), content, 'utf8');
+      }
+      const existingDiag = await fs.readdir(diagDir).catch(() => []);
+      for (const file of existingDiag) {
+        if (isValidDocFile(file, 'html') && !keepDiag.has(file)) {
+          await fs.unlink(path.join(diagDir, file)).catch(() => {});
+        }
+      }
+    }
+  }
 }
 
 async function readTemplateFiles(dir: string): Promise<Record<string, string>> {
@@ -169,7 +296,7 @@ export async function loadProject(slug: string): Promise<LoadedProject> {
   const dir = resolveProjectDir(slug);
   await fs.access(dir);
 
-  const [config, design, controls, templateFiles, overrides, customCss, git, assets] =
+  const [config, design, controls, templateFiles, docs, overrides, customCss, git, assets] =
     await Promise.all([
       readJsonOrDefault<ProjectConfig>(
         path.join(dir, 'project.json'),
@@ -184,13 +311,14 @@ export async function loadProject(slug: string): Promise<LoadedProject> {
         createDefaultControlsSchema(),
       ),
       readTemplateFiles(dir),
+      readProjectDocs(dir),
       readJsonOrDefault<CardOverrides>(path.join(dir, 'overrides.json'), {}),
       readTextOrDefault(path.join(dir, 'custom.css'), ''),
       getGitStatus(dir),
       listAssets(slug),
     ]);
 
-  return { config, design, controls, templateFiles, overrides, customCss, git, assets };
+  return { config, design, controls, templateFiles, docs, overrides, customCss, git, assets };
 }
 
 export async function createProject(params: {
@@ -295,6 +423,7 @@ export async function saveProjectDesign(
     design?: DesignConfig;
     controls?: ControlsSchema;
     templateFiles?: Record<string, string>;
+    docs?: ProjectDocsMap;
     overrides?: CardOverrides;
     customCss?: string;
     commitMessage?: string;
@@ -329,6 +458,9 @@ export async function saveProjectDesign(
   }
   if (payload.templateFiles) {
     await writeTemplateFiles(dir, payload.templateFiles);
+  }
+  if (payload.docs) {
+    await writeProjectDocs(dir, payload.docs);
   }
   if (payload.overrides) {
     await fs.writeFile(

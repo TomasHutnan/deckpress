@@ -7,10 +7,12 @@ import type {
   ExpandedCard,
   ExportOptions,
   ProjectConfig,
+  ProjectDocsMap,
 } from '../shared/types';
 import { api, type LoadedProject, type ProjectSummary } from './api';
 import { CardGrid } from './components/CardGrid';
 import { DesignPanel } from './components/DesignPanel';
+import { DocsStudio } from './components/DocsStudio';
 import {
   AssetsModal,
   ExportModal,
@@ -30,8 +32,11 @@ export function App() {
   const [draftDesign, setDraftDesign] = useState<DesignConfig | null>(null);
   const [draftControls, setDraftControls] = useState<ControlsSchema>([]);
   const [draftTemplateFiles, setDraftTemplateFiles] = useState<Record<string, string>>({});
+  const [draftDocs, setDraftDocs] = useState<ProjectDocsMap>({});
   const [draftOverrides, setDraftOverrides] = useState<CardOverrides>({});
   const [draftCustomCss, setDraftCustomCss] = useState<string>('');
+
+  const [activeView, setActiveView] = useState<'cards' | 'docs'>('cards');
 
   const [cards, setCards] = useState<ExpandedCard[]>([]);
   const [cardsWarning, setCardsWarning] = useState<string>('');
@@ -48,6 +53,7 @@ export function App() {
     setDraftDesign(structuredClone(proj.design));
     setDraftControls(structuredClone(proj.controls));
     setDraftTemplateFiles(structuredClone(proj.templateFiles));
+    setDraftDocs(structuredClone(proj.docs || {}));
     setDraftOverrides(structuredClone(proj.overrides));
     setDraftCustomCss(proj.customCss);
   };
@@ -92,6 +98,7 @@ export function App() {
       JSON.stringify(draftDesign) !== JSON.stringify(savedProject.design) ||
       JSON.stringify(draftControls) !== JSON.stringify(savedProject.controls) ||
       JSON.stringify(draftTemplateFiles) !== JSON.stringify(savedProject.templateFiles) ||
+      JSON.stringify(draftDocs) !== JSON.stringify(savedProject.docs || {}) ||
       JSON.stringify(draftOverrides) !== JSON.stringify(savedProject.overrides) ||
       draftCustomCss !== savedProject.customCss
     );
@@ -101,6 +108,7 @@ export function App() {
     draftDesign,
     draftControls,
     draftTemplateFiles,
+    draftDocs,
     draftOverrides,
     draftCustomCss,
   ]);
@@ -112,6 +120,7 @@ export function App() {
       design: draftDesign,
       controls: draftControls,
       templateFiles: draftTemplateFiles,
+      docs: draftDocs,
       overrides: draftOverrides,
       customCss: draftCustomCss,
       commitMessage,
@@ -236,6 +245,24 @@ export function App() {
           <button type="button" className="btn" onClick={() => setModal('new')}>
             + New / Clone
           </button>
+          {savedProject && (
+            <div className="view-tabs">
+              <button
+                type="button"
+                className={`view-tab ${activeView === 'cards' ? 'active' : ''}`}
+                onClick={() => setActiveView('cards')}
+              >
+                Cards
+              </button>
+              <button
+                type="button"
+                className={`view-tab ${activeView === 'docs' ? 'active' : ''}`}
+                onClick={() => setActiveView('docs')}
+              >
+                Rules &amp; Docs
+              </button>
+            </div>
+          )}
           {isDirty && <span className="draft-badge">Unsaved Draft</span>}
         </div>
 
@@ -292,6 +319,20 @@ export function App() {
       {cardsWarning && <div className="banner">{cardsWarning}</div>}
 
       {savedProject && draftConfig && draftDesign && activeVariant ? (
+        activeView === 'docs' ? (
+          <DocsStudio
+            slug={activeSlug}
+            docs={draftDocs}
+            cards={cards}
+            cardSize={draftConfig.cardSize}
+            variant={activeVariant}
+            templateFiles={draftTemplateFiles}
+            overrides={draftOverrides}
+            customCss={draftCustomCss}
+            customFontFacesCss={customFontFacesCss}
+            onDocsChange={setDraftDocs}
+          />
+        ) : (
         <div className="workspace">
           <DesignPanel
             config={draftConfig}
@@ -343,6 +384,7 @@ export function App() {
             }
           />
         </div>
+        )
       ) : (
         <div style={{ padding: 48, textAlign: 'center', color: '#6b7280' }}>
           <h2>Welcome to DeckPress</h2>

@@ -196,3 +196,26 @@ export interface AssetList {
   icons: string[];
   images: string[];
 }
+
+export type DocPageSize = 'A4' | 'A3' | 'Letter';
+export type DocOrientation = 'portrait' | 'landscape';
+
+export interface ProjectDocMeta {
+  title: string;
+  pageSize?: DocPageSize;
+  orientation?: DocOrientation;
+  columns?: number;
+  marginMm?: number;
+  sections?: string[];
+}
+
+export interface ProjectDoc {
+  id: string;
+  meta: ProjectDocMeta;
+  stylesCss: string;
+  sections: Record<string, string>;
+  diagrams: Record<string, string>;
+  renderJs?: string;
+}
+
+export type ProjectDocsMap = Record<string, ProjectDoc>;

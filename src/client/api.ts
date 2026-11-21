@@ -10,6 +10,7 @@ import type {
   GitCommitInfo,
   GitStatusInfo,
   ProjectConfig,
+  ProjectDocsMap,
 } from '../shared/types';
 
 export interface ProjectSummary {
@@ -24,6 +25,7 @@ export interface LoadedProject {
   design: DesignConfig;
   controls: ControlsSchema;
   templateFiles: Record<string, string>;
+  docs: ProjectDocsMap;
   overrides: CardOverrides;
   customCss: string;
   git: GitStatusInfo;
@@ -86,6 +88,7 @@ export const api = {
       design?: DesignConfig;
       controls?: ControlsSchema;
       templateFiles?: Record<string, string>;
+      docs?: ProjectDocsMap;
       overrides?: CardOverrides;
       customCss?: string;
       commitMessage?: string;
@@ -180,6 +183,28 @@ export const api = {
     if (!res.ok) {
       const data = await res.json().catch(() => ({ error: res.statusText }));
       throw new Error(data.error || 'PDF export failed');
+    }
+    return res.blob();
+  },
+
+  exportDocPdf: async (
+    slug: string,
+    payload: {
+      docId: string;
+      title: string;
+      bodyHtml: string;
+      docCss: string;
+      cardBaseCss: string;
+    },
+  ): Promise<Blob> => {
+    const res = await fetch(`/api/projects/${encodeURIComponent(slug)}/export/doc`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(data.error || 'Document PDF export failed');
     }
     return res.blob();
   },

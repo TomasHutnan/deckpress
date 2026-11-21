@@ -11,6 +11,7 @@ Single source of truth for **DeckPress** (`deckpress`) — architecture, rules, 
   - [ADR-0002](docs/adr/0002-pdf-export-alpine-chromium.md): Server-side WYSIWYG PDF export via Alpine + system Chromium (`puppeteer-core`)
   - [ADR-0003](docs/adr/0003-project-storage-and-local-git.md): Gitignored `projects/` directory with a local Git repo per project, live UI drafts, named variants, and optional Git remote sync
   - [ADR-0004](docs/adr/0004-project-owned-renderer-and-controls.md): Per-project `renderer.js` and `controls.json` so layout, rules, and UI controls evolve without Docker rebuilds
+  - [ADR-0005](docs/adr/0005-markdown-rules-and-overview-cards.md): Project-owned section-split Markdown rules (`docs/`), live card embeds, auto-generated card lists, and native DeckPress overview cards
 
 ## Commands
 - `npm test` — Run unit tests (`node --test src/shared/*.test.ts`)
@@ -36,4 +37,6 @@ Single source of truth for **DeckPress** (`deckpress`) — architecture, rules, 
 - [x] `[ADR-0002]` Built Chromium PDF export (individual 1-card-per-page, packed sheets with variable gap, bleed, optional crop marks/cut grid) + `Dockerfile` & `compose.yaml`.
 - [x] `[ADR-0004]` Migrated DeckPress to project-owned multi-file `template/` (`index.js`, `styles.css`, `require('./...')` modules) + declarative `controls.json`, live multi-tab `</> Template` editor, and bundled self-hosted `@fontsource` fonts (full Slovak diacritics).
 - [x] `[ADR-0004]` Updated `projects/the-menu/` (standalone Git repo) with modular `template/` (left-bleeding headers, dual-cuisine stripe, per-kitchen footers & Chef's Pen color shared between `"menu"` marker and 6 hand-drawn subtitle accent styles, `joins_dish` metadata alignment, merged `subtitle` footers/disclaimers) and cleaned `cards.csv` (114 playable cards).
-- [x] Drafted and compiled Slovak rulebook ([project/rules/rules.pdf](project/rules/rules.pdf), double-sided A4 landscape) and 4-up 63×88 mm player overviews ([project/rules/overview.pdf](project/rules/overview.pdf)) using generated card PNGs in `project/rules/img/`.
+- [x] Drafted and compiled Slovak rulebook (`projects/the-menu/rules/rules.tex`), 4-up 63×88 mm player overviews (`projects/the-menu/rules/overview.tex`), and auto-generated card list (`projects/the-menu/rules/card_list.tex`).
+
+- [x] `[ADR-0005]` Extended DeckPress with project-owned `docs/` (section-split Markdown + `{{card:...}}`/`{{pill:...}}`/`{{count:...}}`/`{{diagram:...}}` directives + programmatic `render.js`, `Rules & Docs` studio tab, Chromium PDF export) and migrated `projects/the-menu/` to native 63×88 mm overview cards (`template/overview.js`), `docs/rules/`, and `docs/card-list/`.

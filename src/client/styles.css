@@ -447,3 +447,141 @@ input[type="range"] {
   border-radius: 6px;
   font-size: 12px;
 }
+
+/* --- View Switcher & Docs Studio (ADR-0005) --- */
+.view-tabs {
+  display: inline-flex;
+  background: #f3f4f6;
+  border: 1px solid var(--ui-border);
+  border-radius: 7px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.view-tab {
+  border: 0;
+  background: transparent;
+  padding: 4px 10px;
+  border-radius: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ui-muted);
+  cursor: pointer;
+}
+
+.view-tab.active {
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.docs-sidebar {
+  width: 400px;
+  background: var(--ui-surface);
+  border-right: 1px solid var(--ui-border);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex-shrink: 0;
+  min-height: 0;
+}
+
+.docs-switcher {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.docs-files {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.docs-file-group-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ui-muted);
+  margin-bottom: 4px;
+}
+
+.docs-file-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.docs-file-pill {
+  border: 1px solid var(--ui-border);
+  background: #f9fafb;
+  color: var(--ui-text);
+  padding: 3px 8px;
+  border-radius: 5px;
+  font-size: 11.5px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  cursor: pointer;
+}
+
+.docs-file-pill.active {
+  background: var(--ui-accent);
+  color: #ffffff;
+  border-color: var(--ui-accent);
+}
+
+.btn-link {
+  border: 0;
+  background: transparent;
+  color: var(--ui-primary);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+
+.docs-editor {
+  flex: 1;
+  min-height: 180px;
+  width: 100%;
+  resize: none;
+  border: 1px solid var(--ui-border);
+  border-radius: 6px;
+  padding: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  background: #fafafa;
+  color: var(--ui-text);
+}
+
+.docs-hint {
+  font-size: 11px;
+  color: var(--ui-muted);
+  line-height: 1.4;
+}
+
+.docs-hint code {
+  background: #f3f4f6;
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+.docs-preview-scroll {
+  flex: 1;
+  overflow: auto;
+  padding: 24px;
+  background: #e5e7eb;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.docs-page-stage .dp-doc-page {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.16);
+  margin-bottom: 18px;
+}

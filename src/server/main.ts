@@ -4,6 +4,7 @@ import fastifyStatic from '@fastify/static';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import type { ControlsSchema } from '../shared/controls.js';
+import { wrapDocPrintHtml } from '../shared/docs.js';
 import { renderPrintDocumentHtml } from '../shared/renderCard.js';
 import type {
   CardOverrides,
@@ -11,6 +12,7 @@ import type {
   DesignVariant,
   ExportOptions,
   ProjectConfig,
+  ProjectDocsMap,
 } from '../shared/types.js';
 import { createBasicAuthVerifier } from './auth.js';
 import { getBuiltinFontsCss } from './fonts.js';
@@ -124,6 +126,7 @@ app.put<{
     design?: DesignConfig;
     controls?: ControlsSchema;
     templateFiles?: Record<string, string>;
+    docs?: ProjectDocsMap;
     overrides?: CardOverrides;
     customCss?: string;
     commitMessage?: string;
@@ -377,6 +380,47 @@ app.post<{
         'Content-Disposition',
         `attachment; filename="${slug}-${opts.mode}.pdf"`,
       );
+    return reply.send(pdfBuffer);
+  } catch (err: unknown) {
+    req.log.error(err);
+    return reply.code(500).send({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// --- Document (Rules / Card List) PDF Export via Chromium ---
+app.post<{
+  Params: { slug: string };
+  Body: {
+    docId: string;
+    title: string;
+    bodyHtml: string;
+    docCss: string;
+    cardBaseCss: string;
+  };
+}>('/api/projects/:slug/export/doc', async (req, reply) => {
+  try {
+    const slug = req.params.slug;
+    const { docId, title, bodyHtml, docCss, cardBaseCss } = req.body;
+    const baseHref = `http://127.0.0.1:${PORT}/`;
+    const [builtinFontsCss, customFontFacesCss] = await Promise.all([
+      getBuiltinFontsCss(),
+      buildInlineCustomFontFacesCss(slug),
+    ]);
+
+    const html = wrapDocPrintHtml({
+      title: title || docId || slug,
+      bodyHtml,
+      docCss,
+      cardBaseCss,
+      fontFacesCss: `${builtinFontsCss}\n${customFontFacesCss}`,
+      baseHref,
+    });
+
+    const pdfBuffer = await renderHtmlToPdf(html, req.headers.authorization);
+    const safeDocId = (docId || 'doc').replace(/[^a-zA-Z0-9_-]/g, '');
+    reply
+      .header('Content-Type', 'application/pdf')
+      .header('Content-Disposition', `attachment; filename="${slug}-${safeDocId}.pdf"`);
     return reply.send(pdfBuffer);
   } catch (err: unknown) {
     req.log.error(err);
