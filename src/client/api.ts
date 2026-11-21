@@ -89,6 +89,7 @@ export const api = {
       controls?: ControlsSchema;
       templateFiles?: Record<string, string>;
       docs?: ProjectDocsMap;
+      cardsCsv?: string;
       overrides?: CardOverrides;
       customCss?: string;
       commitMessage?: string;

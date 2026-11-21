@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { Suspense, useMemo, useState } from 'react';
 import { getOrderedSectionNames, renderProjectDocHtml } from '../../shared/docs';
 import { compileTemplateFiles } from '../../shared/runtime';
 import type {
@@ -9,6 +9,9 @@ import type {
   ProjectDoc,
   ProjectDocsMap,
 } from '../../shared/types';
+import type { CodeLanguage } from './CodeEditor';
+
+const LazyCodeEditor = React.lazy(() => import('./CodeEditor'));
 
 interface DocsStudioProps {
   slug: string;
@@ -30,7 +33,8 @@ type EditorTarget =
   | { kind: 'section'; name: string }
   | { kind: 'diagram'; name: string }
   | { kind: 'styles' }
-  | { kind: 'renderJs' };
+  | { kind: 'renderJs' }
+  | { kind: 'meta' };
 
 export function DocsStudio({
   slug,
@@ -76,6 +80,31 @@ export function DocsStudio({
         : { kind: 'styles' },
   );
   const [zoom, setZoom] = useState(() => activeDoc?.meta.defaultZoom ?? 0.75);
+  const [sidebarWidth, setSidebarWidth] = useState(420);
+  const [metaDraft, setMetaDraft] = useState(() =>
+    activeDoc ? JSON.stringify(activeDoc.meta, null, 2) : '{}',
+  );
+  const [metaError, setMetaError] = useState('');
+
+  const handleResizeStart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = sidebarWidth;
+    const onMove = (ev: MouseEvent) => {
+      const next = Math.max(260, Math.min(860, startW + (ev.clientX - startX)));
+      setSidebarWidth(next);
+    };
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
 
   const compiledTemplate = useMemo(
     () => compileTemplateFiles(templateFiles),
@@ -120,6 +149,8 @@ export function DocsStudio({
     const next = docs[id];
     if (!next) return;
     setZoom(next.meta.defaultZoom ?? 0.75);
+    setMetaDraft(JSON.stringify(next.meta, null, 2));
+    setMetaError('');
     if (next.renderJs !== undefined) {
       setTarget({ kind: 'renderJs' });
     } else {
@@ -156,10 +187,36 @@ export function DocsStudio({
     if (target.kind === 'section') return activeDoc.sections[target.name] ?? '';
     if (target.kind === 'diagram') return activeDoc.diagrams[target.name] ?? '';
     if (target.kind === 'renderJs') return activeDoc.renderJs ?? '';
+    if (target.kind === 'meta') return metaDraft;
     return activeDoc.stylesCss ?? '';
-  }, [activeDoc, target]);
+  }, [activeDoc, target, metaDraft]);
+
+  const currentLanguage: CodeLanguage =
+    target.kind === 'section'
+      ? 'markdown'
+      : target.kind === 'diagram'
+        ? 'html'
+        : target.kind === 'renderJs'
+          ? 'javascript'
+          : target.kind === 'meta'
+            ? 'json'
+            : 'css';
 
   const handleEditorChange = (val: string) => {
+    if (target.kind === 'meta') {
+      setMetaDraft(val);
+      try {
+        const parsed = JSON.parse(val);
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+          throw new Error('doc.json must be a JSON object');
+        }
+        setMetaError('');
+        updateActiveDoc((d) => ({ ...d, meta: parsed }));
+      } catch (err: unknown) {
+        setMetaError(err instanceof Error ? err.message : 'Invalid JSON');
+      }
+      return;
+    }
     updateActiveDoc((d) => {
       if (target.kind === 'section') {
         return { ...d, sections: { ...d.sections, [target.name]: val } };
@@ -185,7 +242,7 @@ export function DocsStudio({
 
   return (
     <div className="workspace">
-      <aside className="docs-sidebar">
+      <aside className="docs-sidebar" style={{ width: sidebarWidth }}>
         <div className="docs-switcher">
           {docIds.map((id) => (
             <button
@@ -264,16 +321,34 @@ export function DocsStudio({
               >
                 styles.css
               </button>
+              <button
+                type="button"
+                className={`docs-file-pill ${target.kind === 'meta' ? 'active' : ''}`}
+                title="Edit doc.json (title, order, defaultZoom, pageSize, orientation, columns, sections)"
+                onClick={() => {
+                  setMetaDraft(JSON.stringify(activeDoc.meta, null, 2));
+                  setMetaError('');
+                  setTarget({ kind: 'meta' });
+                }}
+              >
+                ⚙ doc.json
+              </button>
             </div>
           </div>
         </div>
 
-        <textarea
-          className="docs-editor"
-          spellCheck={false}
-          value={currentEditorValue}
-          onChange={(e) => handleEditorChange(e.target.value)}
-        />
+        <div className="docs-editor-wrap">
+          <Suspense fallback={<div className="docs-editor">Loading editor...</div>}>
+            <LazyCodeEditor
+              value={currentEditorValue}
+              language={currentLanguage}
+              onChange={handleEditorChange}
+            />
+          </Suspense>
+        </div>
+        {target.kind === 'meta' && metaError && (
+          <div style={{ color: '#dc2626', fontSize: 11.5 }}>{metaError}</div>
+        )}
 
         <div className="docs-hint">
           Directives: <code>{'{{card:CARD_029}}'}</code> · <code>{'{{card-row: ...}}'}</code> ·{' '}
@@ -281,6 +356,11 @@ export function DocsStudio({
           <code>{'{{diagram:name}}'}</code> · <code>---col---</code> · <code>---page---</code>
         </div>
       </aside>
+      <div
+        className="docs-resizer"
+        title="Drag to resize editor"
+        onMouseDown={handleResizeStart}
+      />
 
       <main className="canvas-pane">
         <div className="canvas-toolbar">
@@ -299,10 +379,13 @@ export function DocsStudio({
               Zoom {Math.round(zoom * 100)}%
               <input
                 type="range"
-                min={0.4}
-                max={2.0}
-                step={0.05}
-                value={zoom}
+                min={activeDoc.meta.minZoom ?? 0.4}
+                max={activeDoc.meta.maxZoom ?? 2.0}
+                step={activeDoc.meta.zoomStep ?? 0.05}
+                value={Math.min(
+                  activeDoc.meta.maxZoom ?? 2.0,
+                  Math.max(activeDoc.meta.minZoom ?? 0.4, zoom),
+                )}
                 onChange={(e) => setZoom(Number(e.target.value))}
               />
             </label>

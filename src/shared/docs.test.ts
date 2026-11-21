@@ -187,3 +187,30 @@ test('renderPrintDocumentHtml mirrors back sheets for duplex printing', async ()
   assert.ok(html.indexOf('dp-empty-slot') < html.indexOf('class="b2"'));
   assert.ok(html.indexOf('class="b2"') < html.indexOf('class="b1"'));
 });
+
+test('serializeCsv and parseCsv round-trip Slovak text, commas, and quotes', async () => {
+  const { parseCsv, serializeCsv } = await import('./csv.js');
+  const rows = [
+    {
+      id: 'CARD_103',
+      type_group: 'Akcia',
+      kitchen: '',
+      color: '',
+      size: '',
+      title: 'EŠTE RAZ, POPROSÍM',
+      subtitle: 'ZAHRAJ KEDYKOĽVEK\\nNEPOČÍTA SA DO LIMITU',
+      tags_str: '',
+      count: 2,
+      image: '',
+      is_action: '1',
+      description: 'Zopakuj „účinok“ karty',
+    },
+  ];
+  const csv = serializeCsv(rows);
+  const parsed = parseCsv(csv);
+  assert.equal(parsed.length, 1);
+  assert.equal(parsed[0].title, 'EŠTE RAZ, POPROSÍM');
+  assert.equal(parsed[0].subtitle, 'ZAHRAJ KEDYKOĽVEK\\nNEPOČÍTA SA DO LIMITU');
+  assert.equal(parsed[0].count, 2);
+  assert.equal(parsed[0].description, 'Zopakuj „účinok“ karty');
+});

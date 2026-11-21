@@ -1,17 +1,19 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type { ControlsSchema } from '../shared/controls';
+import { expandCards, serializeCsv } from '../shared/csv';
 import { renderProjectDocHtml } from '../shared/docs';
 import { compileTemplateFiles } from '../shared/runtime';
 import type {
   CardOverrides,
+  CardRow,
   DesignConfig,
-  ExpandedCard,
   ExportOptions,
   ProjectConfig,
   ProjectDocsMap,
 } from '../shared/types';
 import { api, type LoadedProject, type ProjectSummary } from './api';
 import { CardGrid } from './components/CardGrid';
+import { DataEditor } from './components/DataEditor';
 import { DesignPanel } from './components/DesignPanel';
 import { DocsStudio } from './components/DocsStudio';
 import {
@@ -37,12 +39,14 @@ export function App() {
   const [draftOverrides, setDraftOverrides] = useState<CardOverrides>({});
   const [draftCustomCss, setDraftCustomCss] = useState<string>('');
 
-  const [activeView, setActiveView] = useState<'cards' | 'docs'>('cards');
+  const [activeView, setActiveView] = useState<'cards' | 'data' | 'docs'>('cards');
   const [activeDocId, setActiveDocId] = useState<string>('');
   const [exportingDoc, setExportingDoc] = useState(false);
   const [docExportError, setDocExportError] = useState('');
 
-  const [cards, setCards] = useState<ExpandedCard[]>([]);
+  const [savedCardRows, setSavedCardRows] = useState<CardRow[]>([]);
+  const [draftCardRows, setDraftCardRows] = useState<CardRow[]>([]);
+  const cards = useMemo(() => expandCards(draftCardRows), [draftCardRows]);
   const [cardsWarning, setCardsWarning] = useState<string>('');
   const [syncing, setSyncing] = useState(false);
 
@@ -66,7 +70,8 @@ export function App() {
     setSyncing(true);
     try {
       const res = await api.fetchCards(slug);
-      setCards(res.cards);
+      setSavedCardRows(structuredClone(res.rows));
+      setDraftCardRows(structuredClone(res.rows));
       setCardsWarning(res.warning || '');
     } catch (err: unknown) {
       setCardsWarning(err instanceof Error ? err.message : String(err));
@@ -95,9 +100,15 @@ export function App() {
     refreshProjectList().catch(console.error);
   }, []);
 
+  const cardsDirty = useMemo(
+    () => JSON.stringify(draftCardRows) !== JSON.stringify(savedCardRows),
+    [draftCardRows, savedCardRows],
+  );
+
   const isDirty = useMemo(() => {
     if (!savedProject || !draftConfig || !draftDesign) return false;
     return (
+      cardsDirty ||
       JSON.stringify(draftConfig) !== JSON.stringify(savedProject.config) ||
       JSON.stringify(draftDesign) !== JSON.stringify(savedProject.design) ||
       JSON.stringify(draftControls) !== JSON.stringify(savedProject.controls) ||
@@ -107,6 +118,7 @@ export function App() {
       draftCustomCss !== savedProject.customCss
     );
   }, [
+    cardsDirty,
     savedProject,
     draftConfig,
     draftDesign,
@@ -125,18 +137,23 @@ export function App() {
       controls: draftControls,
       templateFiles: draftTemplateFiles,
       docs: draftDocs,
+      ...(cardsDirty ? { cardsCsv: serializeCsv(draftCardRows) } : {}),
       overrides: draftOverrides,
       customCss: draftCustomCss,
       commitMessage,
       push,
     });
     applyLoadedProject(updated);
+    if (cardsDirty) {
+      setSavedCardRows(structuredClone(draftCardRows));
+    }
   };
 
   const handleDiscard = () => {
     if (!savedProject) return;
     if (!confirm('Discard unsaved draft changes?')) return;
     applyLoadedProject(savedProject);
+    setDraftCardRows(structuredClone(savedCardRows));
   };
 
   const handleSyncSheet = async () => {
@@ -151,7 +168,8 @@ export function App() {
   const handleUploadCsv = async (file: File) => {
     if (!activeSlug) return;
     const res = await api.uploadCsv(activeSlug, file);
-    setCards(res.cards);
+    setSavedCardRows(structuredClone(res.rows));
+    setDraftCardRows(structuredClone(res.rows));
     setCardsWarning('');
   };
 
@@ -329,6 +347,13 @@ export function App() {
               </button>
               <button
                 type="button"
+                className={`view-tab ${activeView === 'data' ? 'active' : ''}`}
+                onClick={() => setActiveView('data')}
+              >
+                Data
+              </button>
+              <button
+                type="button"
                 className={`view-tab ${activeView === 'docs' ? 'active' : ''}`}
                 onClick={() => setActiveView('docs')}
               >
@@ -342,14 +367,6 @@ export function App() {
         <div className="topbar-right">
           {savedProject && (
             <>
-              <button
-                type="button"
-                className="btn"
-                disabled={syncing}
-                onClick={handleSyncSheet}
-              >
-                {syncing ? 'Syncing...' : '↻ Sync Sheet'}
-              </button>
               <button type="button" className="btn" onClick={() => setModal('assets')}>
                 Assets
               </button>
@@ -414,6 +431,13 @@ export function App() {
             customFontFacesCss={customFontFacesCss}
             exportError={docExportError}
             onDocsChange={setDraftDocs}
+          />
+        ) : activeView === 'data' ? (
+          <DataEditor
+            slug={activeSlug}
+            rows={draftCardRows}
+            onRowsChange={setDraftCardRows}
+            onUploadCsv={handleUploadCsv}
           />
         ) : (
         <div className="workspace">

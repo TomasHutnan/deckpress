@@ -119,3 +119,48 @@ export function expandCards(rows: CardRow[]): ExpandedCard[] {
   }
   return expanded;
 }
+
+const DEFAULT_CSV_COLUMNS = [
+  'id',
+  'type_group',
+  'kitchen',
+  'size',
+  'title',
+  'subtitle',
+  'tags_str',
+  'count',
+  'image',
+  'is_action',
+  'joins_dish',
+  'description',
+  'recipe_change',
+];
+
+function escapeCsvCell(value: string | number | undefined): string {
+  const str = value === undefined || value === null ? '' : String(value);
+  if (/[",\r\n]/.test(str)) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  return str;
+}
+
+/**
+ * Serializes CardRow[] back to RFC-4180 UTF-8 CSV, preserving standard columns plus any custom columns.
+ */
+export function serializeCsv(rows: CardRow[], preferredColumns?: string[]): string {
+  const colSet = new Set<string>(preferredColumns && preferredColumns.length > 0 ? preferredColumns : DEFAULT_CSV_COLUMNS);
+  for (const row of rows) {
+    for (const key of Object.keys(row)) {
+      if (key.startsWith('_') || key === 'color' && !row.color) continue;
+      if (row[key] !== undefined && row[key] !== '') {
+        colSet.add(key);
+      }
+    }
+  }
+  const cols = Array.from(colSet);
+  const lines = [cols.join(',')];
+  for (const row of rows) {
+    lines.push(cols.map((c) => escapeCsvCell(row[c])).join(','));
+  }
+  return lines.join('\n') + '\n';
+}

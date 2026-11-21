@@ -424,6 +424,7 @@ export async function saveProjectDesign(
     controls?: ControlsSchema;
     templateFiles?: Record<string, string>;
     docs?: ProjectDocsMap;
+    cardsCsv?: string;
     overrides?: CardOverrides;
     customCss?: string;
     commitMessage?: string;
@@ -461,6 +462,19 @@ export async function saveProjectDesign(
   }
   if (payload.docs) {
     await writeProjectDocs(dir, payload.docs);
+  }
+  if (payload.cardsCsv !== undefined) {
+    const cfg =
+      payload.config ||
+      (await readJsonOrDefault<ProjectConfig>(
+        path.join(dir, 'project.json'),
+        createStarterProjectConfig(slug, slug),
+      ));
+    await fs.writeFile(
+      path.join(dir, cfg.localCsv || 'cards.csv'),
+      payload.cardsCsv,
+      'utf8',
+    );
   }
   if (payload.overrides) {
     await fs.writeFile(

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
 import type { ControlsSchema } from '../../shared/controls';
 import type {
   AssetList,
@@ -12,6 +12,18 @@ import type {
   SheetFormat,
 } from '../../shared/types';
 import { api, type LoadedProject } from '../api';
+import type { CodeLanguage } from './CodeEditor';
+
+const LazyCodeEditor = React.lazy(() => import('./CodeEditor'));
+
+function detectFileLanguage(filename: string): CodeLanguage {
+  const lower = filename.toLowerCase();
+  if (lower.endsWith('.js') || lower.endsWith('.mjs') || lower.endsWith('.ts')) return 'javascript';
+  if (lower.endsWith('.css')) return 'css';
+  if (lower.endsWith('.html') || lower.endsWith('.svg')) return 'html';
+  if (lower.endsWith('.json')) return 'json';
+  return 'markdown';
+}
 
 /* ---------- Template & Controls Editor Modal ---------- */
 export function TemplateModal({
@@ -133,13 +145,14 @@ export function TemplateModal({
               Sidebar Controls Schema — add/edit sliders, color pickers, toggles, or
               dropdowns
             </label>
-            <textarea
-              className="code-area"
-              style={{ minHeight: 400 }}
-              spellCheck={false}
-              value={controlsText}
-              onChange={(e) => handleControlsEdit(e.target.value)}
-            />
+            <Suspense fallback={<div className="code-area">Loading editor...</div>}>
+              <LazyCodeEditor
+                value={controlsText}
+                language="json"
+                minHeight={420}
+                onChange={handleControlsEdit}
+              />
+            </Suspense>
             {jsonError && (
               <div style={{ color: '#dc2626', fontSize: 12 }}>{jsonError}</div>
             )}
@@ -147,13 +160,14 @@ export function TemplateModal({
         ) : activeTab === 'custom.css' ? (
           <div className="field">
             <label>Project Custom CSS — appended live in preview and PDF export</label>
-            <textarea
-              className="code-area"
-              style={{ minHeight: 400 }}
-              spellCheck={false}
-              value={customCss}
-              onChange={(e) => onCustomCssChange(e.target.value)}
-            />
+            <Suspense fallback={<div className="code-area">Loading editor...</div>}>
+              <LazyCodeEditor
+                value={customCss}
+                language="css"
+                minHeight={420}
+                onChange={onCustomCssChange}
+              />
+            </Suspense>
           </div>
         ) : (
           <div className="field">
@@ -171,18 +185,19 @@ export function TemplateModal({
                 </button>
               )}
             </label>
-            <textarea
-              className="code-area"
-              style={{ minHeight: 400 }}
-              spellCheck={false}
-              value={templateFiles[activeTab] ?? ''}
-              onChange={(e) =>
-                onTemplateFilesChange({
-                  ...templateFiles,
-                  [activeTab]: e.target.value,
-                })
-              }
-            />
+            <Suspense fallback={<div className="code-area">Loading editor...</div>}>
+              <LazyCodeEditor
+                value={templateFiles[activeTab] ?? ''}
+                language={detectFileLanguage(activeTab)}
+                minHeight={420}
+                onChange={(val) =>
+                  onTemplateFilesChange({
+                    ...templateFiles,
+                    [activeTab]: val,
+                  })
+                }
+              />
+            </Suspense>
           </div>
         )}
 

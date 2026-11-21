@@ -207,6 +207,9 @@ export interface ProjectDocMeta {
   title: string;
   order?: number;
   defaultZoom?: number;
+  minZoom?: number;
+  maxZoom?: number;
+  zoomStep?: number;
   pageSize?: DocPageSize;
   orientation?: DocOrientation;
   columns?: number;
