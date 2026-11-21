@@ -1,14 +1,14 @@
 # Architecture
 
-Map of the **Card Studio** system. Decisions and their rationale live in `docs/adr/`.
+Map of the **DeckPress** (`deckpress`) system. Decisions and their rationale live in `docs/adr/`.
 
 ## Purpose and priorities
-Card Studio is a self-hosted, single-container web application for creating data-driven, semi-randomized tabletop card games from spreadsheets (Google Sheets or CSV) and exporting print-ready PDFs.
+DeckPress is a self-hosted, single-container web application for creating data-driven, semi-randomized tabletop card games from spreadsheets (Google Sheets or CSV) and exporting print-ready PDFs.
 
 Ranked priorities:
 1. **Ease of use for non-coders** (browser-based Design Studio, spreadsheet data source, 1-click PDF export).
-2. **Visual fidelity & creative flexibility** (exact typographic/Swiss card design, deterministic seeded semi-randomization, pluggable middle canvas: empty / SVG icon pattern / per-card artwork).
-3. **Simple single-container deployment** (`node:20-alpine` + system Chromium, mounted `projects/` volume, optional password auth).
+2. **Visual fidelity & creative flexibility** (project-owned HTML/CSS/SVG templates, deterministic seeded semi-randomization, pluggable middle canvas: empty / SVG icon pattern / watermark / per-card artwork).
+3. **Simple single-container deployment** (`node:20-alpine` + system Chromium, mounted `projects/` volume, optional scrypt password auth).
 
 ## Structure
 ```mermaid
@@ -45,13 +45,16 @@ projects/the-menu/
 ├─ project.json          # Project metadata, Google Sheet URL / local CSV path, default card size
 ├─ design.json           # Active variant + named variants (values for controls)
 ├─ controls.json         # Declarative sidebar controls schema for this game
-├─ renderer.js           # Project-owned HTML/CSS/SVG card renderer (runs in browser & Chromium)
+├─ template/             # Modular project-owned renderer (or legacy single-file renderer.js)
+│  ├─ index.js           # Entry point exporting getBaseCss() & renderCard(); supports require('./...')
+│  ├─ styles.css         # Template stylesheet (loaded via readFile('./styles.css'))
+│  └─ *.js               # Optional helper modules (kitchens, accents, card types, etc.)
 ├─ overrides.json        # Per-card locked seeds or layout overrides keyed by card.id
 ├─ custom.css            # Optional advanced CSS escape hatch
 ├─ cards.csv             # Fallback / local snapshot of card table
 └─ assets/
    ├─ fonts/             # Uploaded .woff2 / .ttf fonts
-   ├─ icons/             # Uploaded SVG food icons for procedural background patterns
+   ├─ icons/             # Uploaded SVG icons for procedural background patterns
    └─ images/            # Per-card illustrations
 ```
 
@@ -70,9 +73,9 @@ projects/the-menu/
 - `POST /api/projects/:slug/export/pdf` — render & download PDF with `{ cardWidthMm, cardHeightMm, bleedMm, mode, sheetFormat, gapMm, guidelines, variant, draftDesign? }`
 
 ## Risks and open questions
-- **Fonts for `the-menu`**: The reference images use condensed bold display sans (similar to Bebas Neue / Oswald / Impact), light italic sans for tags, and playful script/display fonts for `"menu"`. We should bundle/load clean open-source equivalents (e.g., Google Fonts / local `.woff2` in `assets/fonts/`) with full Slovak diacritics (`á, č, ď, é, í, ĺ, ľ, ň, ó, ô, ŕ, š, ť, ú, ý, ž`) and let the user swap them in the UI.
-- **Git credentials security**: Remote tokens must never be written inside `projects/<slug>/.git/config` if the user exports the folder, or should be clearly separated/redacted when disconnecting a remote.
-- **VPS memory during PDF export**: Headless Chromium PDF generation should run through a single-concurrency queue on the server so two simultaneous exports don't OOM a 1 GB VPS.
+- **Fonts**: Commercially-free open-source fonts (`@fontsource/*`, SIL OFL / Apache 2.0) with full Slovak diacritics (`á, č, ď, é, í, ĺ, ľ, ň, ó, ô, ŕ, š, ť, ú, ý, ž`) are bundled and self-hosted by DeckPress for both browser preview and offline Chromium PDF export; users can also upload custom `.woff2`/`.ttf` fonts into `assets/fonts/`.
+- **Git credentials security**: Remote tokens are stored in gitignored `projects/<slug>/.env` (`0600`), never inside `.git/config` or committed files.
+- **VPS memory during PDF export**: Headless Chromium PDF generation runs through a single-concurrency queue on the server so simultaneous exports don't OOM a small VPS.
 
 ## Decisions
 - [ADR-0001: Replace Jubbly with a Dedicated Single-Container Card Studio Web App](adr/0001-dedicated-card-studio-app.md)
