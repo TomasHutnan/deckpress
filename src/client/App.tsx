@@ -39,7 +39,11 @@ export function App() {
   const [draftOverrides, setDraftOverrides] = useState<CardOverrides>({});
   const [draftCustomCss, setDraftCustomCss] = useState<string>('');
 
-  const [activeView, setActiveView] = useState<'cards' | 'data' | 'docs'>('cards');
+  const [activeView, setActiveView] = useState<'cards' | 'data' | 'docs'>(() =>
+    typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches
+      ? 'docs'
+      : 'cards',
+  );
   const [activeDocId, setActiveDocId] = useState<string>('');
   const [exportingDoc, setExportingDoc] = useState(false);
   const [docExportError, setDocExportError] = useState('');
@@ -55,6 +59,7 @@ export function App() {
     'none' | 'new' | 'save' | 'git' | 'assets' | 'export' | 'template'
   >('none');
   const [assetsTab, setAssetsTab] = useState<'images' | 'icons' | 'fonts'>('images');
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const applyLoadedProject = (proj: LoadedProject) => {
     setSavedProject(proj);
@@ -293,6 +298,8 @@ export function App() {
         overrides: draftOverrides,
         renderer: compiled.renderer,
         assetBaseUrl,
+        includeComments: false,
+        includeSourceMap: false,
       });
       if (rendered.error) throw new Error(rendered.error);
       const cardBaseCss = compiled.renderer.getBaseCss(zeroBleedSize, draftCustomCss);
@@ -316,8 +323,204 @@ export function App() {
     }
   };
 
+  const activeProjectName =
+    projects.find((p) => p.slug === activeSlug)?.name || activeSlug || 'DeckPress';
+
   return (
     <div className="studio-shell">
+      {/* Compact single-row topbar for smartphones (<= 768px) */}
+      <header className="mobile-topbar">
+        <button
+          type="button"
+          className="btn mobile-icon-btn"
+          aria-label="Open navigation menu"
+          onClick={() => setMobileNavOpen(true)}
+        >
+          ☰
+        </button>
+        <div className="mobile-topbar-title">
+          <span className="brand-dot" />
+          <span className="mobile-project-name">{activeProjectName}</span>
+          {isDirty && <span className="mobile-dirty-dot" title="Unsaved draft" />}
+        </div>
+        {savedProject && (
+          <button
+            type="button"
+            className="btn btn-dark mobile-save-btn"
+            disabled={!isDirty && !savedProject.git.dirty}
+            onClick={() => setModal('save')}
+          >
+            Save
+          </button>
+        )}
+      </header>
+
+      {/* Retractable mobile navigation drawer */}
+      {mobileNavOpen && (
+        <div className="mobile-drawer-backdrop" onClick={() => setMobileNavOpen(false)}>
+          <nav
+            className="mobile-drawer"
+            aria-label="Navigation"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mobile-drawer-head">
+              <div className="brand">
+                <span className="brand-dot" />
+                DeckPress
+              </div>
+              <button
+                type="button"
+                className="btn btn-xs"
+                aria-label="Close navigation"
+                onClick={() => setMobileNavOpen(false)}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="mobile-drawer-section">
+              <div className="docs-file-group-head">
+                <span>Project</span>
+              </div>
+              <select
+                value={activeSlug}
+                onChange={(e) => {
+                  void selectProject(e.target.value);
+                  setMobileNavOpen(false);
+                }}
+              >
+                {projects.length === 0 && <option value="">No projects yet</option>}
+                {projects.map((p) => (
+                  <option key={p.slug} value={p.slug}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => {
+                  setMobileNavOpen(false);
+                  setModal('new');
+                }}
+              >
+                + New / Clone Project
+              </button>
+            </div>
+
+            {savedProject && (
+              <>
+                <div className="mobile-drawer-section">
+                  <div className="docs-file-group-head">
+                    <span>View</span>
+                  </div>
+                  <div className="mobile-drawer-stack">
+                    <button
+                      type="button"
+                      className={`btn ${activeView === 'docs' ? 'btn-dark' : ''}`}
+                      onClick={() => {
+                        setActiveView('docs');
+                        setMobileNavOpen(false);
+                      }}
+                    >
+                      Rules &amp; Docs
+                    </button>
+                    <button
+                      type="button"
+                      className={`btn ${activeView === 'cards' ? 'btn-dark' : ''}`}
+                      onClick={() => {
+                        setActiveView('cards');
+                        setMobileNavOpen(false);
+                      }}
+                    >
+                      Cards
+                    </button>
+                    <button
+                      type="button"
+                      className={`btn ${activeView === 'data' ? 'btn-dark' : ''}`}
+                      onClick={() => {
+                        setActiveView('data');
+                        setMobileNavOpen(false);
+                      }}
+                    >
+                      Data
+                    </button>
+                  </div>
+                </div>
+
+                <div className="mobile-drawer-section">
+                  <div className="docs-file-group-head">
+                    <span>Tools &amp; Export</span>
+                  </div>
+                  <div className="mobile-drawer-stack">
+                    <button
+                      type="button"
+                      className="btn"
+                      onClick={() => {
+                        setMobileNavOpen(false);
+                        setModal('assets');
+                      }}
+                    >
+                      Assets
+                    </button>
+                    <button
+                      type="button"
+                      className="btn"
+                      onClick={() => {
+                        setMobileNavOpen(false);
+                        setModal('template');
+                      }}
+                    >
+                      &lt;/&gt; Template
+                    </button>
+                    <button
+                      type="button"
+                      className="btn"
+                      onClick={() => {
+                        setMobileNavOpen(false);
+                        setModal('git');
+                      }}
+                    >
+                      History &amp; Git
+                    </button>
+                    {isDirty && (
+                      <button
+                        type="button"
+                        className="btn btn-danger"
+                        onClick={() => {
+                          setMobileNavOpen(false);
+                          handleDiscard();
+                        }}
+                      >
+                        Revert Draft
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      disabled={
+                        activeView === 'docs' &&
+                        (exportingDoc || Object.keys(draftDocs).length === 0)
+                      }
+                      onClick={() => {
+                        setMobileNavOpen(false);
+                        if (activeView === 'docs') {
+                          void handleExportActiveDoc();
+                        } else {
+                          setModal('export');
+                        }
+                      }}
+                    >
+                      {activeView === 'docs' && exportingDoc ? 'Exporting...' : 'Export PDF'}
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </nav>
+        </div>
+      )}
+
       <header className="topbar">
         <div className="topbar-left">
           <div className="brand">
@@ -421,6 +624,7 @@ export function App() {
       {savedProject && draftConfig && draftDesign && activeVariant ? (
         activeView === 'docs' ? (
           <DocsStudio
+            key={activeSlug}
             slug={activeSlug}
             docs={draftDocs}
             activeDocId={activeDocId}

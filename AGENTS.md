@@ -13,6 +13,7 @@ Single source of truth for **DeckPress** (`deckpress`) — architecture, rules, 
   - [ADR-0004](docs/adr/0004-project-owned-renderer-and-controls.md): Per-project `renderer.js` and `controls.json` so layout, rules, and UI controls evolve without Docker rebuilds
   - [ADR-0005](docs/adr/0005-markdown-rules-and-overview-cards.md): Project-owned section-split Markdown rules (`docs/`), live card embeds, auto-generated card lists, and native DeckPress overview cards
   - [ADR-0006](docs/adr/0006-game-agnostic-engine.md): Game-agnostic core engine (dynamic CSV columns, generic doc `{{count:...}}` filters, extracted print imposition, slim core fonts)
+  - [ADR-0007](docs/adr/0007-mobile-docs-and-playtest-comments.md): Mobile-first Rules & Docs playtest mode, HTML playtest comments (`<!-- ... -->`), Safe Comment Mode, preview comment tooltips, and click-to-focus navigation
 
 ## Commands
 - `npm test` — Run unit tests (`node --test src/shared/*.test.ts`)

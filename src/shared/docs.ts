@@ -39,6 +39,190 @@ export interface RenderDocContext {
   renderer: ProjectRenderer;
   assetBaseUrl: string;
   customIconsSvg?: string[];
+  /** When true (Studio preview), highlight commented lines and render hover comment markers. Defaults to false (export-safe). */
+  includeComments?: boolean;
+  /** When true (Studio preview), attach data-dp-section / data-dp-line attributes for click-to-focus navigation. Defaults to false. */
+  includeSourceMap?: boolean;
+}
+
+export interface DocCommentRange {
+  from: number;
+  to: number;
+  innerFrom: number;
+  innerTo: number;
+  text: string;
+}
+
+export function isLayoutDirectiveComment(body: string): boolean {
+  return /^(?:colbreak|pagebreak)$/i.test(body.trim());
+}
+
+/**
+ * Finds all playtest HTML comments (`<!-- ... -->`) in Markdown text,
+ * ignoring DeckPress layout directives (`<!-- colbreak -->`, `<!-- pagebreak -->`).
+ */
+export function findDocCommentRanges(text: string): DocCommentRange[] {
+  const ranges: DocCommentRange[] = [];
+  const re = /<!--([\s\S]*?)-->/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    if (isLayoutDirectiveComment(m[1])) continue;
+    ranges.push({
+      from: m.index,
+      to: m.index + m[0].length,
+      innerFrom: m.index + 4,
+      innerTo: m.index + m[0].length - 3,
+      text: m[1].trim(),
+    });
+  }
+  return ranges;
+}
+
+export function countSectionComments(md: string): number {
+  return findDocCommentRanges(md).length;
+}
+
+export function countDocComments(doc: ProjectDoc): number {
+  return Object.values(doc.sections || {}).reduce(
+    (sum, md) => sum + countSectionComments(md || ''),
+    0,
+  );
+}
+
+interface SourceLine {
+  text: string;
+  section: string;
+  line: number;
+}
+
+function stripInlineCommentsFromLine(line: string): { text: string; hadComment: boolean } {
+  const ranges = findDocCommentRanges(line);
+  if (ranges.length === 0) return { text: line, hadComment: false };
+  let out = '';
+  let cursor = 0;
+  for (const r of ranges) {
+    out += line.slice(cursor, r.from);
+    cursor = r.to;
+  }
+  out += line.slice(cursor);
+  // Collapse double spaces left by removing an inline comment while preserving leading indentation
+  const indentMatch = out.match(/^(\s*)(.*)$/);
+  const indent = indentMatch ? indentMatch[1] : '';
+  const body = (indentMatch ? indentMatch[2] : out).replace(/ {2,}/g, ' ').trimEnd();
+  return { text: `${indent}${body}`, hadComment: true };
+}
+
+function normalizeSectionLines(
+  sectionName: string,
+  md: string,
+  includeComments: boolean,
+): SourceLine[] {
+  const rawLines = md.replace(/\r\n/g, '\n').split('\n');
+  // First pass: fold multi-line non-layout `<!-- ... -->` comments onto their starting line
+  // while preserving original 1-based line numbers for all subsequent lines.
+  const folded: SourceLine[] = [];
+  let i = 0;
+  while (i < rawLines.length) {
+    let lineText = rawLines[i];
+    const startLine = i + 1;
+    i++;
+    // Check if an unclosed `<!--` remains at the end of this line
+    while (true) {
+      const lastOpen = lineText.lastIndexOf('<!--');
+      const lastClose = lineText.lastIndexOf('-->');
+      if (lastOpen !== -1 && lastOpen > lastClose && i < rawLines.length) {
+        lineText = `${lineText} ${rawLines[i].trim()}`;
+        i++;
+      } else {
+        break;
+      }
+    }
+
+    if (includeComments) {
+      folded.push({ text: lineText, section: sectionName, line: startLine });
+    } else {
+      const stripped = stripInlineCommentsFromLine(lineText);
+      // Drop lines that contained only playtest comments so export has zero blank-line artifacts
+      if (stripped.hadComment && stripped.text.trim() === '') {
+        continue;
+      }
+      folded.push({ text: stripped.text, section: sectionName, line: startLine });
+    }
+  }
+  return folded;
+}
+
+/**
+ * Strips all playtest HTML comments from Markdown while preserving layout directives
+ * (`<!-- colbreak -->`, `<!-- pagebreak -->`) and avoiding extra blank lines.
+ */
+export function stripDocComments(md: string): string {
+  return normalizeSectionLines('', md, false)
+    .map((l) => l.text)
+    .join('\n');
+}
+
+/**
+ * Updates the Nth (0-based) playtest comment in a Markdown section.
+ * If `nextText` is blank, deletes the comment cleanly.
+ */
+export function updateDocComment(md: string, commentIdx: number, nextText: string): string {
+  const trimmed = nextText.trim();
+  if (!trimmed) return deleteDocComment(md, commentIdx);
+  const ranges = findDocCommentRanges(md);
+  const target = ranges[commentIdx];
+  if (!target) return md;
+  return `${md.slice(0, target.from)}<!-- ${trimmed} -->${md.slice(target.to)}`;
+}
+
+/**
+ * Deletes the Nth (0-based) playtest comment in a Markdown section,
+ * removing the entire line if the comment stood alone or collapsing a single leading space if inline.
+ */
+export function deleteDocComment(md: string, commentIdx: number): string {
+  const ranges = findDocCommentRanges(md);
+  const target = ranges[commentIdx];
+  if (!target) return md;
+
+  const lineStart = md.lastIndexOf('\n', target.from - 1) + 1;
+  const nextNl = md.indexOf('\n', target.to);
+  const lineEnd = nextNl === -1 ? md.length : nextNl;
+  const beforeOnLine = md.slice(lineStart, target.from);
+  const afterOnLine = md.slice(target.to, lineEnd);
+
+  // If the comment was the only content on its line, drop the whole line
+  if (beforeOnLine.trim() === '' && afterOnLine.trim() === '') {
+    if (nextNl !== -1) {
+      return md.slice(0, lineStart) + md.slice(nextNl + 1);
+    }
+    if (lineStart > 0) {
+      return md.slice(0, lineStart - 1);
+    }
+    return '';
+  }
+
+  let delFrom = target.from;
+  let delTo = target.to;
+  if (delFrom > lineStart && md[delFrom - 1] === ' ') {
+    delFrom -= 1;
+  } else if (delTo < lineEnd && md[delTo] === ' ') {
+    delTo += 1;
+  }
+  return md.slice(0, delFrom) + md.slice(delTo);
+}
+
+/**
+ * Appends a new playtest comment (`<!-- text -->`) to the end of a 1-based line in a Markdown section.
+ */
+export function appendCommentToLine(md: string, lineNumber: number, commentText: string): string {
+  const trimmed = commentText.trim();
+  if (!trimmed) return md;
+  const eol = md.includes('\r\n') ? '\r\n' : '\n';
+  const lines = md.split(/\r?\n/);
+  const idx = Math.max(0, Math.min(lines.length - 1, lineNumber - 1));
+  const cur = lines[idx] ?? '';
+  lines[idx] = cur.trim() === '' ? `<!-- ${trimmed} -->` : `${cur.trimEnd()} <!-- ${trimmed} -->`;
+  return lines.join(eol);
 }
 
 function resolvePaletteColor(token: string, palette: Record<string, string>): string {
@@ -194,14 +378,66 @@ function expandDirectives(
   });
 }
 
-function formatInlineMarkdown(text: string, ctx: RenderDocContext): string {
-  // Extract directives first so HTML produced by directives isn't escaped
+function renderCommentMarker(
+  commentText: string,
+  section?: string,
+  line?: number,
+  commentIdx?: number,
+): string {
+  const label = commentText.trim() || '(empty comment)';
+  const metaAttrs =
+    section && commentIdx !== undefined
+      ? ` data-dp-comment-section="${escapeHtml(section)}" data-dp-comment-line="${line ?? 1}" data-dp-comment-idx="${commentIdx}"`
+      : '';
+  return `<span class="dp-doc-comment-marker" tabindex="0"${metaAttrs}><span class="dp-doc-comment-dot" aria-label="Playtest comment">💬</span><span class="dp-doc-comment-tip">${escapeHtml(label)}</span></span>`;
+}
+
+function isStandaloneCommentLine(line: string): boolean {
+  const ranges = findDocCommentRanges(line);
+  if (ranges.length === 0) return false;
+  return stripInlineCommentsFromLine(line).text.trim() === '';
+}
+
+function sourceAttrs(sl: SourceLine | undefined, ctx: RenderDocContext): string {
+  if (!ctx.includeSourceMap || !sl || !sl.section) return '';
+  return ` data-dp-section="${escapeHtml(sl.section)}" data-dp-line="${sl.line}"`;
+}
+
+function formatInlineMarkdown(
+  text: string,
+  ctx: RenderDocContext,
+  sl?: SourceLine,
+  commentCounters?: Map<string, number>,
+): string {
+  // Extract directives and (when previewing) playtest comments first so their HTML isn't escaped
   const tokens: string[] = [];
-  const withPlaceholders = text.replace(/\{\{[a-z-]+(?::[\s\S]*?)?\}\}/gi, (m) => {
+  let withPlaceholders = text.replace(/\{\{[a-z-]+(?::[\s\S]*?)?\}\}/gi, (m) => {
     const idx = tokens.length;
     tokens.push(expandDirectives(m, ctx));
     return `\u0000DIR${idx}\u0000`;
   });
+
+  if (ctx.includeComments) {
+    const ranges = findDocCommentRanges(withPlaceholders);
+    if (ranges.length > 0) {
+      let replaced = '';
+      let cursor = 0;
+      for (const r of ranges) {
+        replaced += withPlaceholders.slice(cursor, r.from);
+        const idx = tokens.length;
+        let cIdx: number | undefined;
+        if (sl?.section && commentCounters) {
+          cIdx = commentCounters.get(sl.section) ?? 0;
+          commentCounters.set(sl.section, cIdx + 1);
+        }
+        tokens.push(renderCommentMarker(r.text, sl?.section, sl?.line, cIdx));
+        replaced += `\u0000DIR${idx}\u0000`;
+        cursor = r.to;
+      }
+      replaced += withPlaceholders.slice(cursor);
+      withPlaceholders = replaced;
+    }
+  }
 
   let out = escapeHtml(withPlaceholders);
   // Inline code
@@ -213,27 +449,29 @@ function formatInlineMarkdown(text: string, ctx: RenderDocContext): string {
   // Italic
   out = out.replace(/\*([^*]+)\*/g, '<em>$1</em>');
 
-  // Restore directive HTML
+  // Restore directive & comment HTML
   out = out.replace(/\u0000DIR(\d+)\u0000/g, (_m, i) => tokens[Number(i)] ?? '');
   return out;
 }
 
-/**
- * Lightweight Markdown-to-HTML parser for DeckPress rulebooks & docs.
- * Supports headings (with optional `[COLOR]` accent tag), lists (with 1-level nesting),
- * callouts (`>`), tables, `---col---` column breaks, and `{{directive:...}}` embeds.
- */
-export function parseMarkdownBlock(md: string, ctx: RenderDocContext): string {
-  const lines = md.replace(/\r\n/g, '\n').split('\n');
+function parseMarkdownLines(
+  sourceLines: SourceLine[],
+  ctx: RenderDocContext,
+  commentCounters: Map<string, number> = new Map(),
+): string {
   const html: string[] = [];
   let i = 0;
 
   const isBlank = (l: string) => l.trim() === '';
   const isBlockDirective = (l: string) => /^\{\{(card-row|diagram|card)(?::[\s\S]*)?\}\}$/i.test(l.trim());
+  const commentClass = (text: string) =>
+    ctx.includeComments && findDocCommentRanges(text).length > 0 ? ' dp-doc-has-comment' : '';
 
-  while (i < lines.length) {
-    const line = lines[i];
+  while (i < sourceLines.length) {
+    const sl = sourceLines[i];
+    const line = sl.text;
     const trimmed = line.trim();
+    const attrs = sourceAttrs(sl, ctx);
 
     if (isBlank(line)) {
       i++;
@@ -247,9 +485,28 @@ export function parseMarkdownBlock(md: string, ctx: RenderDocContext): string {
       continue;
     }
 
+    // Standalone playtest comment line (only present when ctx.includeComments is true)
+    if (ctx.includeComments && isStandaloneCommentLine(line)) {
+      const ranges = findDocCommentRanges(line);
+      const markers = ranges
+        .map((r) => {
+          let cIdx: number | undefined;
+          if (sl.section) {
+            cIdx = commentCounters.get(sl.section) ?? 0;
+            commentCounters.set(sl.section, cIdx + 1);
+          }
+          return renderCommentMarker(r.text, sl.section, sl.line, cIdx);
+        })
+        .join(' ');
+      html.push(`<div class="dp-doc-comment-standalone dp-doc-has-comment"${attrs}>${markers}</div>`);
+      i++;
+      continue;
+    }
+
     // Standalone block directive
     if (isBlockDirective(line)) {
-      html.push(expandDirectives(trimmed, ctx));
+      const expanded = expandDirectives(trimmed, ctx);
+      html.push(attrs ? `<div class="dp-doc-block-wrap"${attrs}>${expanded}</div>` : expanded);
       i++;
       continue;
     }
@@ -267,7 +524,7 @@ export function parseMarkdownBlock(md: string, ctx: RenderDocContext): string {
         titleText = colorTag[2];
       }
       html.push(
-        `<h${level} class="dp-doc-h${level}"${colorStyle}>${formatInlineMarkdown(titleText, ctx)}</h${level}>`,
+        `<h${level} class="dp-doc-h${level}${commentClass(titleText)}"${colorStyle}${attrs}>${formatInlineMarkdown(titleText, ctx, sl, commentCounters)}</h${level}>`,
       );
       i++;
       continue;
@@ -275,13 +532,24 @@ export function parseMarkdownBlock(md: string, ctx: RenderDocContext): string {
 
     // Callout / blockquote (`> ...`)
     if (trimmed.startsWith('>')) {
-      const quoteLines: string[] = [];
-      while (i < lines.length && lines[i].trim().startsWith('>')) {
-        quoteLines.push(lines[i].trim().replace(/^>\s?/, ''));
+      const quoteLines: SourceLine[] = [];
+      while (i < sourceLines.length && sourceLines[i].text.trim().startsWith('>')) {
+        quoteLines.push({
+          ...sourceLines[i],
+          text: sourceLines[i].text.trim().replace(/^>\s?/, ''),
+        });
         i++;
       }
+      const hasAnyComment =
+        ctx.includeComments && quoteLines.some((q) => findDocCommentRanges(q.text).length > 0);
       html.push(
-        `<div class="dp-doc-callout">${quoteLines.map((l) => formatInlineMarkdown(l, ctx)).join('<br />')}</div>`,
+        `<div class="dp-doc-callout${hasAnyComment ? ' dp-doc-has-comment' : ''}"${attrs}>${quoteLines
+          .map((q) => {
+            const qAttrs = sourceAttrs(q, ctx);
+            const inner = formatInlineMarkdown(q.text, ctx, q, commentCounters);
+            return qAttrs ? `<span${qAttrs}>${inner}</span>` : inner;
+          })
+          .join('<br />')}</div>`,
       );
       continue;
     }
@@ -289,8 +557,8 @@ export function parseMarkdownBlock(md: string, ctx: RenderDocContext): string {
     // Markdown table
     if (
       trimmed.startsWith('|') &&
-      i + 1 < lines.length &&
-      /^\|[\s:|-]+\|$/.test(lines[i + 1].trim())
+      i + 1 < sourceLines.length &&
+      /^\|[\s:|-]+\|$/.test(sourceLines[i + 1].text.trim())
     ) {
       const parseRow = (r: string) =>
         r
@@ -299,8 +567,9 @@ export function parseMarkdownBlock(md: string, ctx: RenderDocContext): string {
           .replace(/\|$/, '')
           .split('|')
           .map((c) => c.trim());
+      const headerSl = sl;
       const headerCells = parseRow(trimmed);
-      const alignCells = parseRow(lines[i + 1]);
+      const alignCells = parseRow(sourceLines[i + 1].text);
       const aligns = alignCells.map((a) =>
         a.startsWith(':') && a.endsWith(':')
           ? 'center'
@@ -309,19 +578,19 @@ export function parseMarkdownBlock(md: string, ctx: RenderDocContext): string {
             : 'left',
       );
       i += 2;
-      const bodyRows: string[][] = [];
-      while (i < lines.length && lines[i].trim().startsWith('|')) {
-        bodyRows.push(parseRow(lines[i]));
+      const bodyRows: Array<{ sl: SourceLine; cells: string[] }> = [];
+      while (i < sourceLines.length && sourceLines[i].text.trim().startsWith('|')) {
+        bodyRows.push({ sl: sourceLines[i], cells: parseRow(sourceLines[i].text) });
         i++;
       }
       const hasHeader = headerCells.some((c) => c !== '');
       const thead = hasHeader
-        ? `<thead><tr>${headerCells.map((c, idx) => `<th style="text-align:${aligns[idx] || 'left'}">${formatInlineMarkdown(c, ctx)}</th>`).join('')}</tr></thead>`
+        ? `<thead><tr class="${commentClass(headerSl.text).trim()}"${sourceAttrs(headerSl, ctx)}>${headerCells.map((c, idx) => `<th style="text-align:${aligns[idx] || 'left'}">${formatInlineMarkdown(c, ctx, headerSl, commentCounters)}</th>`).join('')}</tr></thead>`
         : '';
       const tbody = `<tbody>${bodyRows
         .map(
           (r) =>
-            `<tr>${r.map((c, idx) => `<td style="text-align:${aligns[idx] || 'left'}">${formatInlineMarkdown(c, ctx)}</td>`).join('')}</tr>`,
+            `<tr${commentClass(r.sl.text) ? ' class="dp-doc-has-comment"' : ''}${sourceAttrs(r.sl, ctx)}>${r.cells.map((c, idx) => `<td style="text-align:${aligns[idx] || 'left'}">${formatInlineMarkdown(c, ctx, r.sl, commentCounters)}</td>`).join('')}</tr>`,
         )
         .join('')}</tbody>`;
       html.push(`<table class="dp-doc-table">${thead}${tbody}</table>`);
@@ -335,31 +604,40 @@ export function parseMarkdownBlock(md: string, ctx: RenderDocContext): string {
       const tag = isOrdered ? 'ol' : 'ul';
       const items: string[] = [];
 
-      while (i < lines.length) {
-        const m = lines[i].match(/^(\s*)([-*]|\d+\.)\s+(.*)$/);
+      while (i < sourceLines.length) {
+        const curSl = sourceLines[i];
+        const m = curSl.text.match(/^(\s*)([-*]|\d+\.)\s+(.*)$/);
         if (!m) break;
         const indent = m[1].length;
         const itemOrdered = /^\d+\.$/.test(m[2]);
         if (indent === 0 && itemOrdered !== isOrdered) break;
 
-        let itemHtml = formatInlineMarkdown(m[3], ctx);
+        let itemHtml = formatInlineMarkdown(m[3], ctx, curSl, commentCounters);
+        const itemCommentCls = commentClass(m[3]);
+        const itemAttrs = sourceAttrs(curSl, ctx);
         i++;
 
         // Collect nested sub-list items (indented >= 2 spaces)
         const subItems: string[] = [];
         let subOrdered = false;
-        while (i < lines.length) {
-          const sm = lines[i].match(/^(\s{2,})([-*]|\d+\.)\s+(.*)$/);
+        while (i < sourceLines.length) {
+          const subSl = sourceLines[i];
+          const sm = subSl.text.match(/^(\s{2,})([-*]|\d+\.)\s+(.*)$/);
           if (!sm) break;
           if (subItems.length === 0) subOrdered = /^\d+\.$/.test(sm[2]);
-          subItems.push(`<li>${formatInlineMarkdown(sm[3], ctx)}</li>`);
+          const subCls = commentClass(sm[3]) ? ' class="dp-doc-has-comment"' : '';
+          subItems.push(
+            `<li${subCls}${sourceAttrs(subSl, ctx)}>${formatInlineMarkdown(sm[3], ctx, subSl, commentCounters)}</li>`,
+          );
           i++;
         }
         if (subItems.length > 0) {
           const subTag = subOrdered ? 'ol' : 'ul';
           itemHtml += `<${subTag}>${subItems.join('')}</${subTag}>`;
         }
-        items.push(`<li>${itemHtml}</li>`);
+        items.push(
+          `<li${itemCommentCls ? ' class="dp-doc-has-comment"' : ''}${itemAttrs}>${itemHtml}</li>`,
+        );
       }
 
       html.push(`<${tag} class="dp-doc-list">${items.join('')}</${tag}>`);
@@ -368,31 +646,50 @@ export function parseMarkdownBlock(md: string, ctx: RenderDocContext): string {
 
     // Muted note line (`~ text`)
     if (trimmed.startsWith('~ ')) {
-      html.push(`<p class="dp-doc-note">${formatInlineMarkdown(trimmed.slice(2), ctx)}</p>`);
+      const noteText = trimmed.slice(2);
+      html.push(
+        `<p class="dp-doc-note${commentClass(noteText)}"${attrs}>${formatInlineMarkdown(noteText, ctx, sl, commentCounters)}</p>`,
+      );
       i++;
       continue;
     }
 
     // Regular paragraph (merge consecutive plain lines)
-    const paraLines: string[] = [];
+    const paraLines: SourceLine[] = [];
     while (
-      i < lines.length &&
-      !isBlank(lines[i]) &&
-      !lines[i].trim().startsWith('#') &&
-      !lines[i].trim().startsWith('>') &&
-      !lines[i].trim().startsWith('~ ') &&
-      !lines[i].trim().startsWith('|') &&
-      !/^(\s*)([-*]|\d+\.)\s+/.test(lines[i]) &&
-      !/^---\s*(col|page)\s*---$/i.test(lines[i].trim()) &&
-      !isBlockDirective(lines[i])
+      i < sourceLines.length &&
+      !isBlank(sourceLines[i].text) &&
+      !sourceLines[i].text.trim().startsWith('#') &&
+      !sourceLines[i].text.trim().startsWith('>') &&
+      !sourceLines[i].text.trim().startsWith('~ ') &&
+      !sourceLines[i].text.trim().startsWith('|') &&
+      !/^(\s*)([-*]|\d+\.)\s+/.test(sourceLines[i].text) &&
+      !/^---\s*(col|page)\s*---$/i.test(sourceLines[i].text.trim()) &&
+      !/^<!--\s*(?:colbreak|pagebreak)\s*-->$/i.test(sourceLines[i].text.trim()) &&
+      !(ctx.includeComments && isStandaloneCommentLine(sourceLines[i].text)) &&
+      !isBlockDirective(sourceLines[i].text)
     ) {
-      paraLines.push(lines[i].trim());
+      paraLines.push({ ...sourceLines[i], text: sourceLines[i].text.trim() });
       i++;
     }
-    html.push(`<p class="dp-doc-p">${formatInlineMarkdown(paraLines.join(' '), ctx)}</p>`);
+    const mergedText = paraLines.map((p) => p.text).join(' ');
+    const paraHtml = paraLines
+      .map((p) => formatInlineMarkdown(p.text, ctx, p, commentCounters))
+      .join(' ');
+    html.push(`<p class="dp-doc-p${commentClass(mergedText)}"${attrs}>${paraHtml}</p>`);
   }
 
   return html.join('\n');
+}
+
+/**
+ * Lightweight Markdown-to-HTML parser for DeckPress rulebooks & docs.
+ * Supports headings (with optional `[COLOR]` accent tag), lists (with 1-level nesting),
+ * callouts (`>`), tables, `---col---` column breaks, and `{{directive:...}}` embeds.
+ */
+export function parseMarkdownBlock(md: string, ctx: RenderDocContext): string {
+  const lines = normalizeSectionLines('', md, Boolean(ctx.includeComments));
+  return parseMarkdownLines(lines, ctx);
 }
 
 export function getOrderedSectionNames(doc: ProjectDoc): string[] {
@@ -632,6 +929,79 @@ ${buildDocPaletteVarsCss(variant)}
   font-weight: 700;
   border-radius: 1mm;
 }
+
+/* Preview-only playtest comment highlights & hover tooltips (stripped on PDF export) */
+.dp-doc-has-comment {
+  background: rgba(254, 243, 199, 0.78) !important;
+  box-shadow: inset 2px 0 0 #f59e0b;
+  border-radius: 0.6mm;
+}
+
+.dp-doc-h1.dp-doc-has-comment,
+.dp-doc-h2.dp-doc-has-comment {
+  background: var(--sec-color, #141414) !important;
+  box-shadow: 0 0 0 1.5px #f59e0b;
+}
+
+.dp-doc-comment-standalone {
+  display: inline-flex;
+  align-items: center;
+  gap: 1mm;
+  padding: 0.2mm 1.2mm;
+  margin: 0.3mm 0;
+  line-height: 1;
+}
+
+.dp-doc-comment-marker {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+  margin-left: 0.8mm;
+  cursor: pointer;
+  outline: none;
+}
+
+.dp-doc-comment-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 7pt;
+  line-height: 1;
+  padding: 0.3mm 0.8mm;
+  border-radius: 999px;
+  background: #fef3c7;
+  border: 0.3mm solid #f59e0b;
+  color: #92400e;
+}
+
+.dp-doc-comment-tip {
+  display: none;
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 1.2mm);
+  z-index: 40;
+  min-width: 32mm;
+  max-width: 68mm;
+  padding: 1.6mm 2.2mm;
+  border-radius: 1.2mm;
+  background: #1f2937;
+  color: #fef3c7;
+  font-size: 7.4pt;
+  font-weight: 500;
+  font-style: normal;
+  line-height: 1.3;
+  text-transform: none;
+  letter-spacing: normal;
+  white-space: normal;
+  box-shadow: 0 2mm 5mm rgba(0, 0, 0, 0.28);
+  pointer-events: none;
+}
+
+.dp-doc-comment-marker:hover .dp-doc-comment-tip,
+.dp-doc-comment-marker:focus .dp-doc-comment-tip {
+  display: block;
+}
 `;
 }
 
@@ -697,15 +1067,41 @@ export function renderProjectDocHtml(ctx: RenderDocContext): {
 
   // Section-split Markdown doc
   const sectionNames = getOrderedSectionNames(ctx.doc);
-  const combinedMd = sectionNames.map((name) => ctx.doc.sections[name] || '').join('\n\n');
-  const rawPages = combinedMd
-    .split(/^\s*(?:---\s*page\s*---|<!--\s*pagebreak\s*-->)\s*$/im)
-    .map((p) => p.trim())
-    .filter(Boolean);
+  const allLines: SourceLine[] = [];
+  for (let sIdx = 0; sIdx < sectionNames.length; sIdx++) {
+    const name = sectionNames[sIdx];
+    const sectionLines = normalizeSectionLines(
+      name,
+      ctx.doc.sections[name] || '',
+      Boolean(ctx.includeComments),
+    );
+    if (sIdx > 0) {
+      allLines.push({ text: '', section: name, line: 1 });
+    }
+    allLines.push(...sectionLines);
+  }
 
+  // Split into pages on `---page---` or `<!-- pagebreak -->` while keeping section/line metadata
+  const rawPages: SourceLine[][] = [];
+  let currentPage: SourceLine[] = [];
+  for (const sl of allLines) {
+    if (/^\s*(?:---\s*page\s*---|<!--\s*pagebreak\s*-->)\s*$/i.test(sl.text)) {
+      if (currentPage.some((l) => l.text.trim() !== '')) {
+        rawPages.push(currentPage);
+      }
+      currentPage = [];
+    } else {
+      currentPage.push(sl);
+    }
+  }
+  if (currentPage.some((l) => l.text.trim() !== '')) {
+    rawPages.push(currentPage);
+  }
+
+  const commentCounters = new Map<string, number>();
   const pagesHtml = rawPages
-    .map((pageMd) => {
-      const inner = parseMarkdownBlock(pageMd, ctx);
+    .map((pageLines) => {
+      const inner = parseMarkdownLines(pageLines, ctx, commentCounters);
       return `<section class="dp-doc-page"><div class="dp-doc-cols">${inner}</div></section>`;
     })
     .join('\n');

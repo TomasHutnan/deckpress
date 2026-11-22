@@ -1,7 +1,16 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createStarterDesign } from './defaults.js';
-import { getDocPageDims, renderProjectDocHtml } from './docs.js';
+import {
+  appendCommentToLine,
+  countDocComments,
+  deleteDocComment,
+  findDocCommentRanges,
+  getDocPageDims,
+  renderProjectDocHtml,
+  stripDocComments,
+  updateDocComment,
+} from './docs.js';
 import { renderPrintDocumentHtml } from './print.js';
 import { compileTemplateFiles } from './runtime.js';
 import type { ExpandedCard, ProjectDoc } from './types.js';
@@ -161,4 +170,98 @@ test('renderPrintDocumentHtml mirrors back sheets for duplex printing', () => {
   assert.equal((html.match(/class="dp-sheet"/g) || []).length, 2);
   assert.ok(html.indexOf('dp-empty-slot') < html.indexOf('class="b2"'));
   assert.ok(html.indexOf('class="b2"') < html.indexOf('class="b1"'));
+});
+
+test('playtest HTML comments are highlighted in preview, mapped to source lines, and completely stripped on export', () => {
+  const design = createStarterDesign();
+  const variant = design.variants[design.activeVariant];
+  const { renderer } = compileTemplateFiles(undefined);
+
+  const doc: ProjectDoc = {
+    id: 'rules',
+    meta: {
+      title: 'Rules',
+      pageSize: 'A4',
+      orientation: 'portrait',
+      columns: 1,
+      sections: ['01-setup.md', '02-turns.md'],
+    },
+    stylesCss: '',
+    sections: {
+      '01-setup.md': [
+        '## Setup',
+        'Deal 3 cards to each player. <!-- test 4 cards? -->',
+        '<!-- standalone playtest note -->',
+        '<!-- colbreak -->',
+        'Place the deck in the center.',
+      ].join('\n'),
+      '02-turns.md': [
+        '## Turns',
+        '- Draw 1 card <!-- too slow? -->',
+        '- Play 1 card',
+      ].join('\n'),
+    },
+    diagrams: {},
+  };
+
+  // Layout directives are not counted as playtest comments
+  assert.equal(countDocComments(doc), 3);
+  assert.equal(findDocCommentRanges('<!-- colbreak --> <!-- real -->').length, 1);
+
+  // Strip preserves colbreak and drops standalone comment lines without leaving blanks
+  const stripped = stripDocComments(doc.sections['01-setup.md']);
+  assert.equal(
+    stripped,
+    ['## Setup', 'Deal 3 cards to each player.', '<!-- colbreak -->', 'Place the deck in the center.'].join('\n'),
+  );
+
+  // Export mode (default): zero comments, zero highlights, zero source-map attributes
+  const exported = renderProjectDocHtml({
+    doc,
+    cards: SAMPLE_CARDS,
+    variant,
+    cardSize: { widthMm: 63, heightMm: 88, bleedMm: 0 },
+    overrides: {},
+    renderer,
+    assetBaseUrl: '/assets',
+    includeComments: false,
+    includeSourceMap: false,
+  });
+  assert.equal(exported.error, null);
+  assert.ok(!exported.bodyHtml.includes('test 4 cards?'));
+  assert.ok(!exported.bodyHtml.includes('standalone playtest note'));
+  assert.ok(!exported.bodyHtml.includes('dp-doc-has-comment'));
+  assert.ok(!exported.bodyHtml.includes('dp-doc-comment-marker'));
+  assert.ok(!exported.bodyHtml.includes('data-dp-section'));
+  assert.ok(exported.bodyHtml.includes('dp-doc-col-break'));
+
+  // Preview mode: highlights commented lines, renders hover tooltip markers, and attaches source line attrs
+  const preview = renderProjectDocHtml({
+    doc,
+    cards: SAMPLE_CARDS,
+    variant,
+    cardSize: { widthMm: 63, heightMm: 88, bleedMm: 0 },
+    overrides: {},
+    renderer,
+    assetBaseUrl: '/assets',
+    includeComments: true,
+    includeSourceMap: true,
+  });
+  assert.equal(preview.error, null);
+  assert.ok(preview.bodyHtml.includes('dp-doc-has-comment'));
+  assert.ok(preview.bodyHtml.includes('dp-doc-comment-tip">test 4 cards?</span>'));
+  assert.ok(preview.bodyHtml.includes('dp-doc-comment-standalone'));
+  assert.ok(preview.bodyHtml.includes('data-dp-section="01-setup.md" data-dp-line="2"'));
+  assert.ok(preview.bodyHtml.includes('data-dp-section="02-turns.md" data-dp-line="2"'));
+  assert.ok(preview.bodyHtml.includes('data-dp-comment-section="01-setup.md" data-dp-comment-line="2" data-dp-comment-idx="0"'));
+  assert.ok(preview.bodyHtml.includes('data-dp-comment-section="01-setup.md" data-dp-comment-line="3" data-dp-comment-idx="1"'));
+
+  // Preview comment CRUD helpers
+  const updated = updateDocComment(doc.sections['01-setup.md'], 0, 'try 5 cards');
+  assert.ok(updated.includes('Deal 3 cards to each player. <!-- try 5 cards -->'));
+  const deletedStandalone = deleteDocComment(doc.sections['01-setup.md'], 1);
+  assert.ok(!deletedStandalone.includes('standalone playtest note'));
+  assert.ok(deletedStandalone.includes('Deal 3 cards to each player. <!-- test 4 cards? -->\n<!-- colbreak -->'));
+  const appended = appendCommentToLine(doc.sections['02-turns.md'], 3, 'needs icon');
+  assert.ok(appended.endsWith('- Play 1 card <!-- needs icon -->'));
 });
