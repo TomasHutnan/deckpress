@@ -154,9 +154,11 @@ export interface AssetList {
 
 export type DocPageSize = 'A4' | 'A3' | 'Letter';
 export type DocOrientation = 'portrait' | 'landscape';
+export type DocKind = 'print' | 'notes';
 
 export interface ProjectDocMeta {
   title: string;
+  kind?: DocKind;
   order?: number;
   defaultZoom?: number;
   minZoom?: number;

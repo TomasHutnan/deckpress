@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type { ControlsSchema } from '../shared/controls';
 import { expandCards, serializeCsv } from '../shared/csv';
-import { renderProjectDocHtml } from '../shared/docs';
+import { isNotesDoc, renderProjectDocHtml } from '../shared/docs';
 import { compileTemplateFiles } from '../shared/runtime';
 import type {
   CardOverrides,
@@ -325,6 +325,10 @@ export function App() {
 
   const activeProjectName =
     projects.find((p) => p.slug === activeSlug)?.name || activeSlug || 'DeckPress';
+  const activeDocForExport =
+    draftDocs[activeDocId] || Object.values(draftDocs)[0];
+  const hideExportPdf =
+    activeView === 'docs' && isNotesDoc(activeDocForExport);
 
   return (
     <div className="studio-shell">
@@ -495,24 +499,26 @@ export function App() {
                         Revert Draft
                       </button>
                     )}
-                    <button
-                      type="button"
-                      className="btn btn-primary"
-                      disabled={
-                        activeView === 'docs' &&
-                        (exportingDoc || Object.keys(draftDocs).length === 0)
-                      }
-                      onClick={() => {
-                        setMobileNavOpen(false);
-                        if (activeView === 'docs') {
-                          void handleExportActiveDoc();
-                        } else {
-                          setModal('export');
+                    {!hideExportPdf && (
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        disabled={
+                          activeView === 'docs' &&
+                          (exportingDoc || Object.keys(draftDocs).length === 0)
                         }
-                      }}
-                    >
-                      {activeView === 'docs' && exportingDoc ? 'Exporting...' : 'Export PDF'}
-                    </button>
+                        onClick={() => {
+                          setMobileNavOpen(false);
+                          if (activeView === 'docs') {
+                            void handleExportActiveDoc();
+                          } else {
+                            setModal('export');
+                          }
+                        }}
+                      >
+                        {activeView === 'docs' && exportingDoc ? 'Exporting...' : 'Export PDF'}
+                      </button>
+                    )}
                   </div>
                 </div>
               </>
@@ -600,20 +606,22 @@ export function App() {
               >
                 Save Version
               </button>
-              <button
-                type="button"
-                className="btn btn-primary"
-                disabled={activeView === 'docs' && (exportingDoc || Object.keys(draftDocs).length === 0)}
-                onClick={() => {
-                  if (activeView === 'docs') {
-                    handleExportActiveDoc();
-                  } else {
-                    setModal('export');
-                  }
-                }}
-              >
-                {activeView === 'docs' && exportingDoc ? 'Exporting...' : 'Export PDF'}
-              </button>
+              {!hideExportPdf && (
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  disabled={activeView === 'docs' && (exportingDoc || Object.keys(draftDocs).length === 0)}
+                  onClick={() => {
+                    if (activeView === 'docs') {
+                      handleExportActiveDoc();
+                    } else {
+                      setModal('export');
+                    }
+                  }}
+                >
+                  {activeView === 'docs' && exportingDoc ? 'Exporting...' : 'Export PDF'}
+                </button>
+              )}
             </>
           )}
         </div>

@@ -145,6 +145,44 @@ test('renderProjectDocHtml executes programmatic render.js docs', () => {
   assert.ok(res.bodyHtml.includes('Total: 3'));
 });
 
+test('renderProjectDocHtml renders kind=notes as flowing sheet without print pagination', () => {
+  const design = createStarterDesign();
+  const variant = design.variants[design.activeVariant];
+  const { renderer } = compileTemplateFiles(undefined);
+
+  const doc: ProjectDoc = {
+    id: 'notes',
+    meta: {
+      title: 'Playtest Notes',
+      kind: 'notes',
+      sections: ['01-playtests.md', '02-ideas.md'],
+    },
+    stylesCss: '',
+    sections: {
+      '01-playtests.md': '## Playtest 1\n- Kompost worked well\n---page---\n- Second note',
+      '02-ideas.md': '## Ideas\n- Card count: {{count:all}}',
+    },
+    diagrams: {},
+  };
+
+  const res = renderProjectDocHtml({
+    doc,
+    cards: SAMPLE_CARDS,
+    variant,
+    cardSize: { widthMm: 63, heightMm: 88, bleedMm: 0 },
+    overrides: {},
+    renderer,
+    assetBaseUrl: '/assets',
+    includeSourceMap: true,
+  });
+
+  assert.equal(res.error, null);
+  assert.ok(res.bodyHtml.includes('dp-doc-notes-sheet'));
+  assert.ok(!res.bodyHtml.includes('class="dp-doc-page"'));
+  assert.ok(res.bodyHtml.includes('Card count: 3'));
+  assert.ok(res.bodyHtml.includes('data-dp-section="01-playtests.md"'));
+});
+
 test('renderPrintDocumentHtml mirrors back sheets for duplex printing', () => {
   const design = createStarterDesign();
   const variant = design.variants[design.activeVariant];

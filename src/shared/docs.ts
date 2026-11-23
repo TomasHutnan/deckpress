@@ -709,10 +709,15 @@ export function buildDocPaletteVarsCss(variant: DesignVariant): string {
   return `:root {\n  --dp-doc-bg: ${variant.backgroundColor || '#FFFFFF'};\n  --dp-doc-ink: ${variant.textColor || '#141414'};\n  ${entries.join('\n  ')}\n}`;
 }
 
+export function isNotesDoc(doc: ProjectDoc | undefined): boolean {
+  return doc?.meta?.kind === 'notes';
+}
+
 export function getDocBaseCss(doc: ProjectDoc, variant: DesignVariant): string {
   const dims = getDocPageDims(doc.meta.pageSize, doc.meta.orientation);
   const marginMm = doc.meta.marginMm ?? 9.5;
   const cols = doc.meta.columns ?? 1;
+  const notes = isNotesDoc(doc);
 
   return `
 ${buildDocPaletteVarsCss(variant)}
@@ -725,8 +730,85 @@ ${buildDocPaletteVarsCss(variant)}
 .dp-doc-root {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   color: var(--dp-doc-ink, #141414);
-  font-size: 9pt;
-  line-height: 1.35;
+  font-size: ${notes ? '13.5px' : '9pt'};
+  line-height: ${notes ? '1.55' : '1.35'};
+}
+
+.dp-doc-notes-root {
+  width: 100%;
+}
+
+.dp-doc-notes-sheet {
+  width: 100%;
+  max-width: 740px;
+  margin: 0 auto;
+  padding: 24px 30px;
+  box-sizing: border-box;
+  background: #FFFFFF;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+}
+
+.dp-doc-notes-sheet .dp-doc-h1 {
+  margin: 0 0 14px 0;
+  padding: 0 0 8px 0;
+  background: transparent;
+  color: var(--dp-doc-ink, #141414);
+  border-bottom: 2px solid rgba(0, 0, 0, 0.14);
+  font-size: 20px;
+  text-transform: none;
+  letter-spacing: -0.01em;
+}
+
+.dp-doc-notes-sheet .dp-doc-h2 {
+  margin: 22px 0 8px 0;
+  padding: 0 0 4px 0;
+  background: transparent;
+  color: var(--sec-color, #141414);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+  font-size: 15px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.dp-doc-notes-sheet .dp-doc-h3 {
+  margin: 14px 0 4px 0;
+  font-size: 13.5px;
+}
+
+.dp-doc-notes-sheet .dp-doc-p {
+  margin: 0 0 8px 0;
+}
+
+.dp-doc-notes-sheet .dp-doc-list {
+  margin: 0 0 10px 0;
+  padding-left: 20px;
+}
+
+.dp-doc-notes-sheet .dp-doc-list li {
+  margin-bottom: 4px;
+}
+
+.dp-doc-notes-sheet .dp-doc-note {
+  font-size: 12.5px;
+  margin: 0 0 8px 0;
+}
+
+.dp-doc-notes-sheet .dp-doc-callout {
+  padding: 10px 14px;
+  border-radius: 6px;
+  margin: 10px 0 12px 0;
+  font-size: 13px;
+}
+
+.dp-doc-notes-sheet .dp-doc-table {
+  font-size: 12.5px;
+  margin: 10px 0 14px 0;
+}
+
+.dp-doc-notes-sheet .dp-doc-table th,
+.dp-doc-notes-sheet .dp-doc-table td {
+  padding: 6px 10px;
 }
 
 .dp-doc-page {
@@ -1081,6 +1163,24 @@ export function renderProjectDocHtml(ctx: RenderDocContext): {
     allLines.push(...sectionLines);
   }
 
+  const commentCounters = new Map<string, number>();
+
+  // Flowing non-print notes document (no fixed A4 page breaks or multi-column boxes)
+  if (isNotesDoc(ctx.doc)) {
+    const filtered = allLines.filter(
+      (sl) =>
+        !/^\s*(?:---\s*(?:page|col)\s*---|<!--\s*(?:pagebreak|colbreak)\s*-->)\s*$/i.test(
+          sl.text,
+        ),
+    );
+    const inner = parseMarkdownLines(filtered, ctx, commentCounters);
+    return {
+      bodyHtml: `<div class="dp-doc-root dp-doc-notes-root"><article class="dp-doc-notes-sheet">${inner}</article></div>`,
+      css: fullCss,
+      error: null,
+    };
+  }
+
   // Split into pages on `---page---` or `<!-- pagebreak -->` while keeping section/line metadata
   const rawPages: SourceLine[][] = [];
   let currentPage: SourceLine[] = [];
@@ -1098,7 +1198,6 @@ export function renderProjectDocHtml(ctx: RenderDocContext): {
     rawPages.push(currentPage);
   }
 
-  const commentCounters = new Map<string, number>();
   const pagesHtml = rawPages
     .map((pageLines) => {
       const inner = parseMarkdownLines(pageLines, ctx, commentCounters);

@@ -6,6 +6,7 @@ import {
   deleteDocComment,
   findDocCommentRanges,
   getOrderedSectionNames,
+  isNotesDoc,
   renderProjectDocHtml,
   updateDocComment,
 } from '../../shared/docs';
@@ -82,14 +83,20 @@ export function DocsStudio({
   const docIds = useMemo(
     () =>
       Object.keys(docs).sort((a, b) => {
+        const na = isNotesDoc(docs[a]) ? 1 : 0;
+        const nb = isNotesDoc(docs[b]) ? 1 : 0;
+        if (na !== nb) return na - nb;
         const oa = docs[a].meta.order ?? 999;
         const ob = docs[b].meta.order ?? 999;
         return oa !== ob ? oa - ob : a.localeCompare(b);
       }),
     [docs],
   );
+  const printDocIds = useMemo(() => docIds.filter((id) => !isNotesDoc(docs[id])), [docIds, docs]);
+  const notesDocIds = useMemo(() => docIds.filter((id) => isNotesDoc(docs[id])), [docIds, docs]);
   const effectiveDocId = docs[activeDocId] ? activeDocId : docIds[0] || '';
   const activeDoc: ProjectDoc | undefined = effectiveDocId ? docs[effectiveDocId] : undefined;
+  const activeIsNotes = isNotesDoc(activeDoc);
 
   const sectionNames = useMemo(
     () => (activeDoc ? getOrderedSectionNames(activeDoc) : []),
@@ -107,10 +114,15 @@ export function DocsStudio({
         ? { kind: 'section', name: sectionNames[0] }
         : { kind: 'styles' },
   );
-  const [zoom, setZoom] = useState(() => activeDoc?.meta.defaultZoom ?? 0.75);
+  const [zoom, setZoom] = useState(
+    () => activeDoc?.meta.defaultZoom ?? (isNotesDoc(activeDoc) ? 1 : 0.75),
+  );
   const [sidebarWidth, setSidebarWidth] = useState(420);
   const [commentMode, setCommentMode] = useState(
-    () => typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches,
+    () =>
+      !isNotesDoc(activeDoc) &&
+      typeof window !== 'undefined' &&
+      window.matchMedia('(max-width: 768px)').matches,
   );
   const [showComments, setShowComments] = useState(true);
   const [revealLine, setRevealLine] = useState<RevealLineRequest | null>(null);
@@ -323,9 +335,15 @@ export function DocsStudio({
     onActiveDocIdChange(id);
     const next = docs[id];
     if (!next) return;
-    setZoom(next.meta.defaultZoom ?? 0.75);
+    const nextIsNotes = isNotesDoc(next);
+    setZoom(next.meta.defaultZoom ?? (nextIsNotes ? 1 : 0.75));
     setMetaDraft(JSON.stringify(next.meta, null, 2));
     setMetaError('');
+    if (nextIsNotes) {
+      setCommentMode(false);
+    } else if (typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches) {
+      setCommentMode(true);
+    }
     if (next.renderJs !== undefined) {
       setTarget({ kind: 'renderJs' });
     } else {
@@ -467,7 +485,7 @@ export function DocsStudio({
 
           <div className={`docs-nav-panel ${mobileSectionsOpen ? 'open' : ''}`}>
             <div className="docs-switcher">
-              {docIds.map((id) => (
+              {printDocIds.map((id) => (
                 <button
                   key={id}
                   type="button"
@@ -475,6 +493,20 @@ export function DocsStudio({
                   onClick={() => selectDoc(id)}
                 >
                   {docs[id].meta.title || id}
+                </button>
+              ))}
+              {printDocIds.length > 0 && notesDocIds.length > 0 && (
+                <span className="docs-switcher-divider" aria-hidden="true" />
+              )}
+              {notesDocIds.map((id) => (
+                <button
+                  key={id}
+                  type="button"
+                  className={`btn docs-switcher-notes ${id === activeDoc.id ? 'btn-dark' : ''}`}
+                  title="Working notes (not included in print PDF export)"
+                  onClick={() => selectDoc(id)}
+                >
+                  📝 {docs[id].meta.title || id}
                 </button>
               ))}
             </div>
@@ -650,10 +682,13 @@ export function DocsStudio({
             </button>
             <strong>{activeDoc.meta.title}</strong>
             <span style={{ fontSize: 12, color: '#6b7280' }}>
-              {activeDoc.meta.pageSize || 'A4'} {activeDoc.meta.orientation || 'portrait'}
-              {activeDoc.meta.columns && activeDoc.meta.columns > 1
-                ? ` · ${activeDoc.meta.columns} columns`
-                : ''}
+              {activeIsNotes
+                ? 'Notes · Markdown'
+                : `${activeDoc.meta.pageSize || 'A4'} ${activeDoc.meta.orientation || 'portrait'}${
+                    activeDoc.meta.columns && activeDoc.meta.columns > 1
+                      ? ` · ${activeDoc.meta.columns} columns`
+                      : ''
+                  }`}
             </span>
           </div>
 
@@ -694,7 +729,7 @@ export function DocsStudio({
         <div className="docs-preview-scroll" onClick={() => setPreviewPopover(null)}>
           <style>{`${customFontFacesCss}\n${cardBaseCss}\n${rendered.css}`}</style>
           <div
-            className={`docs-page-stage ${commentMode ? 'comment-mode-active' : ''}`}
+            className={`docs-page-stage ${activeIsNotes ? 'docs-notes-stage' : ''} ${commentMode ? 'comment-mode-active' : ''}`}
             style={{ transform: `scale(${zoom})`, transformOrigin: 'top center' }}
             onClick={(e) => {
               e.stopPropagation();

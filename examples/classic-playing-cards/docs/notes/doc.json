@@ -1,0 +1,13 @@
+{
+  "title": "Design Notes",
+  "kind": "notes",
+  "order": 99,
+  "defaultZoom": 1,
+  "minZoom": 0.7,
+  "maxZoom": 1.5,
+  "zoomStep": 0.05,
+  "sections": [
+    "01-playtesting.md",
+    "02-ideas.md"
+  ]
+}

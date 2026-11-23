@@ -502,6 +502,19 @@ input[type="range"] {
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
+  align-items: center;
+}
+
+.docs-switcher-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--ui-border);
+  margin: 0 2px;
+}
+
+.docs-switcher-notes:not(.btn-dark) {
+  border-style: dashed;
+  background: #fafafa;
 }
 
 .docs-files {
@@ -596,6 +609,11 @@ input[type="range"] {
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.16);
   margin-bottom: 18px;
   overflow: visible;
+}
+
+.docs-page-stage.docs-notes-stage {
+  width: 100%;
+  max-width: 760px;
 }
 
 .docs-page-stage [data-dp-section] {
